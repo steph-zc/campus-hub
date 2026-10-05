@@ -20,6 +20,9 @@ data class Event(
 ) {
     fun formattedDate() = format("dd/MM/yyyy 'às' HH:mm")
 
+    // "terça-feira, 20 de outubro de 2026" com a primeira letra maiúscula
+    fun fullDate() = format("EEEE, dd 'de' MMMM 'de' yyyy").replaceFirstChar { it.uppercase() }
+
     fun day() = format("dd")
 
     // "out." vira "OUT"

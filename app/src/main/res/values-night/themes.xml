@@ -8,4 +8,6 @@
         <item name="colorSecondaryVariant">@color/ui_accent</item>
         <item name="colorOnSecondary">@color/black</item>
     </style>
+
+    <style name="ThemeOverlay.CampusHub.Popup" parent="ThemeOverlay.MaterialComponents.Dark" />
 </resources>

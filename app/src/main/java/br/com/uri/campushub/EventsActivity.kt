@@ -82,10 +82,17 @@ class EventsActivity : AppCompatActivity() {
                 }
 
                 val events = result.toObjects(Event::class.java)
-                rvEvents.adapter = EventAdapter(events)
+                rvEvents.adapter = EventAdapter(events) { event -> openDetails(event) }
                 progressBar.visibility = View.GONE
             }
             .addOnFailureListener { error -> showError(error) }
+    }
+
+    private fun openDetails(event: Event) {
+        // manda só o id; a tela de detalhes busca o evento atualizado no Firestore
+        val intent = Intent(this, EventDetailsActivity::class.java)
+        intent.putExtra(EventDetailsActivity.EXTRA_EVENT_ID, event.id)
+        startActivity(intent)
     }
 
     private fun showError(error: Exception) {

@@ -14,4 +14,7 @@
         <item name="windowActionBar">false</item>
         <item name="windowNoTitle">true</item>
     </style>
+
+    <!-- menu ⋮ da Toolbar; sem isso ele herda o texto branco da barra -->
+    <style name="ThemeOverlay.CampusHub.Popup" parent="ThemeOverlay.MaterialComponents.Light" />
 </resources>

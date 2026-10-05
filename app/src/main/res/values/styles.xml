@@ -13,4 +13,15 @@
         <item name="chipStartPadding">8dp</item>
         <item name="ensureMinTouchTargetSize">false</item>
     </style>
+
+    <!-- linha com ícone e texto na tela de detalhes -->
+    <style name="Widget.CampusHub.InfoRow" parent="android:Widget.TextView">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_marginTop">8dp</item>
+        <item name="android:drawablePadding">12dp</item>
+        <item name="android:gravity">center_vertical</item>
+        <item name="android:textSize">16sp</item>
+        <item name="drawableTint">?attr/colorPrimary</item>
+    </style>
 </resources>

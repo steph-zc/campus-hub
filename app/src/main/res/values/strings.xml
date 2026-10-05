@@ -28,6 +28,9 @@
     <string name="capacity">%1$d vagas</string>
     <string name="open_to_all">Aberto a todos</string>
     <string name="course_only">Exclusivo do curso</string>
+    <string name="event_details">Detalhes do evento</string>
+    <string name="about_event">Sobre o evento</string>
+    <string name="event_not_found">Evento não encontrado</string>
 
     <string-array name="courses">
         <item>@string/select_course</item>
