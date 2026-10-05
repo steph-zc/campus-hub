@@ -23,6 +23,11 @@
     <string name="reset_email_sent">Se o email estiver cadastrado, você receberá o link em instantes</string>
     <string name="hello_user">Olá, %1$s!</string>
     <string name="logout">Sair</string>
+    <string name="events">Eventos</string>
+    <string name="upcoming_events">Confira os próximos eventos da universidade</string>
+    <string name="capacity">%1$d vagas</string>
+    <string name="open_to_all">Aberto a todos</string>
+    <string name="course_only">Exclusivo do curso</string>
 
     <string-array name="courses">
         <item>@string/select_course</item>

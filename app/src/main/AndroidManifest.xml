@@ -26,7 +26,9 @@
 
         <activity android:name=".LoginActivity" />
 
-        <activity android:name=".EventsActivity" />
+        <activity
+            android:name=".EventsActivity"
+            android:theme="@style/Theme.CampusHub.NoActionBar" />
 
     </application>
 

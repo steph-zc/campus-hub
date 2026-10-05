@@ -8,4 +8,10 @@
         <item name="colorSecondaryVariant">@color/ui_accent_dark</item>
         <item name="colorOnSecondary">@color/black</item>
     </style>
+
+    <!-- telas com Toolbar própria no layout -->
+    <style name="Theme.CampusHub.NoActionBar">
+        <item name="windowActionBar">false</item>
+        <item name="windowNoTitle">true</item>
+    </style>
 </resources>

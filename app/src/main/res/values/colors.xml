@@ -7,6 +7,16 @@
     <color name="ui_accent_dark">#FFB45309</color>
     <color name="ui_accent_light">#FFFCD34D</color>
 
+    <color name="screen_background">#FFF1F5F9</color>
+
+    <!-- etiquetas dos cartões de evento -->
+    <color name="chip_course_bg">#FFDBEAFE</color>
+    <color name="chip_course_text">#FF1E3A8A</color>
+    <color name="chip_open_bg">#FFDCFCE7</color>
+    <color name="chip_open_text">#FF166534</color>
+    <color name="chip_closed_bg">#FFFEF3C7</color>
+    <color name="chip_closed_text">#FF92400E</color>
+
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
 </resources>
