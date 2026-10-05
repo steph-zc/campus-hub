@@ -14,6 +14,9 @@
     <string name="account_created">Conta criada!</string>
     <string name="fill_all_fields">Preencha todos os campos</string>
     <string name="short_password">A senha precisa ter pelo menos 6 caracteres</string>
+    <string name="login_failed">Email ou senha incorretos</string>
+    <string name="hello_user">Olá, %1$s!</string>
+    <string name="logout">Sair</string>
 
     <string-array name="courses">
         <item>@string/select_course</item>

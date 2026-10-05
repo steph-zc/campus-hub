@@ -1,5 +1,6 @@
 package br.com.uri.campushub
 
+import android.content.Intent
 import android.os.Bundle
 import android.widget.Button
 import android.widget.EditText
@@ -83,11 +84,18 @@ class RegisterActivity : AppCompatActivity() {
                 db.collection("users").document(uid).set(user)
                     .addOnSuccessListener {
                         Toast.makeText(this, R.string.account_created, Toast.LENGTH_SHORT).show()
-                        finish()
+                        openEvents()
                     }
                     .addOnFailureListener { error -> showError(error) }
             }
             .addOnFailureListener { error -> showError(error) }
+    }
+
+    // o Firebase já deixa a conta nova logada
+    private fun openEvents() {
+        val intent = Intent(this, EventsActivity::class.java)
+        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+        startActivity(intent)
     }
 
     private fun showError(error: Exception) {
