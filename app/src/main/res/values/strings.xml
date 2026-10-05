@@ -15,6 +15,12 @@
     <string name="fill_all_fields">Preencha todos os campos</string>
     <string name="short_password">A senha precisa ter pelo menos 6 caracteres</string>
     <string name="login_failed">Email ou senha incorretos</string>
+    <string name="forgot_password">Esqueci minha senha</string>
+    <string name="reset_password_message">Digite seu email para receber um link de redefinição de senha.</string>
+    <string name="send">Enviar</string>
+    <string name="cancel">Cancelar</string>
+    <string name="fill_email">Preencha o email</string>
+    <string name="reset_email_sent">Se o email estiver cadastrado, você receberá o link em instantes</string>
     <string name="hello_user">Olá, %1$s!</string>
     <string name="logout">Sair</string>
 
