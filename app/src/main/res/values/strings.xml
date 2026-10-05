@@ -3,4 +3,26 @@
     <string name="app_slogan">Os eventos da universidade em um só lugar</string>
     <string name="login">Login</string>
     <string name="register">Registrar</string>
+    <string name="back">Voltar</string>
+    <string name="create_account">Criar conta</string>
+    <string name="name">Nome</string>
+    <string name="select_course">Selecione o curso</string>
+    <string name="email">Email</string>
+    <string name="password">Senha</string>
+    <string name="confirm_password">Confirmar senha</string>
+    <string name="passwords_dont_match">As senhas não coincidem</string>
+    <string name="account_created">Conta criada!</string>
+    <string name="fill_all_fields">Preencha todos os campos</string>
+    <string name="short_password">A senha precisa ter pelo menos 6 caracteres</string>
+
+    <string-array name="courses">
+        <item>@string/select_course</item>
+        <item>Administração</item>
+        <item>Agronomia</item>
+        <item>Arquitetura</item>
+        <item>Ciência da Computação</item>
+        <item>Direito</item>
+        <item>Engenharia Civil</item>
+        <item>Medicina</item>
+    </string-array>
 </resources>
