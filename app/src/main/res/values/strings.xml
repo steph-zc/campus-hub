@@ -1,3 +1,67 @@
 <resources>
     <string name="app_name">CampusHub</string>
+    <string name="app_slogan">Os eventos da universidade em um só lugar</string>
+    <string name="login">Login</string>
+    <string name="register">Registrar</string>
+    <string name="back">Voltar</string>
+    <string name="create_account">Criar conta</string>
+    <string name="name">Nome</string>
+    <string name="select_course">Selecione o curso</string>
+    <string name="email">Email</string>
+    <string name="password">Senha</string>
+    <string name="confirm_password">Confirmar senha</string>
+    <string name="passwords_dont_match">As senhas não coincidem</string>
+    <string name="account_created">Conta criada!</string>
+    <string name="fill_all_fields">Preencha todos os campos</string>
+    <string name="short_password">A senha precisa ter pelo menos 6 caracteres</string>
+    <string name="login_failed">Email ou senha incorretos</string>
+    <string name="forgot_password">Esqueci minha senha</string>
+    <string name="reset_password_message">Digite seu email para receber um link de redefinição de senha.</string>
+    <string name="send">Enviar</string>
+    <string name="cancel">Cancelar</string>
+    <string name="fill_email">Preencha o email</string>
+    <string name="reset_email_sent">Se o email estiver cadastrado, você receberá o link em instantes</string>
+    <string name="hello_user">Olá, %1$s!</string>
+    <string name="logout">Sair</string>
+    <string name="events">Eventos</string>
+    <string name="upcoming_events">Confira os próximos eventos da universidade</string>
+    <string name="capacity">%1$d vagas</string>
+    <string name="open_to_all">Aberto a todos</string>
+    <string name="course_only">Exclusivo do curso</string>
+    <string name="event_details">Detalhes do evento</string>
+    <string name="about_event">Sobre o evento</string>
+    <string name="event_not_found">Evento não encontrado</string>
+    <string name="remaining_spots">%1$d vagas restantes</string>
+    <string name="spots_of_capacity">%1$d de %2$d vagas disponíveis</string>
+    <string name="sold_out">Vagas esgotadas</string>
+    <string name="enroll">Inscrever-se</string>
+    <string name="cancel_enrollment">Cancelar inscrição</string>
+    <string name="enrolled_banner">Você está inscrito neste evento</string>
+    <string name="only_for_course">Exclusivo para alunos de %1$s</string>
+    <string name="enrolled_success">Inscrição confirmada!</string>
+    <string name="enrollment_canceled">Inscrição cancelada</string>
+    <string name="cancel_enrollment_question">Cancelar sua inscrição neste evento?</string>
+    <string name="keep_enrollment">Manter</string>
+    <string name="my_events">Meus eventos</string>
+    <string name="no_enrollments">Nenhuma inscrição ainda</string>
+    <string name="no_enrollments_hint">Os eventos em que você se inscrever vão aparecer aqui.</string>
+    <string name="browse_events">Ver eventos</string>
+    <string name="profile">Meu perfil</string>
+    <string name="edit_profile">Editar dados</string>
+    <string name="course">Curso</string>
+    <string name="save">Salvar alterações</string>
+    <string name="profile_saved">Perfil atualizado!</string>
+    <string name="fill_name">Preencha o nome</string>
+    <string name="logout_account">Sair da conta</string>
+
+    <string-array name="courses">
+        <item>@string/select_course</item>
+        <item>Administração</item>
+        <item>Agronomia</item>
+        <item>Arquitetura</item>
+        <item>Ciência da Computação</item>
+        <item>Direito</item>
+        <item>Engenharia Civil</item>
+        <item>Medicina</item>
+    </string-array>
 </resources>
