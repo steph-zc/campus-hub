@@ -65,7 +65,21 @@ events/{eventId}
 - O `uid` vem do Firebase Authentication, o que liga o perfil à conta.
 - A inscrição usa o id do evento como id do documento, então o aluno não se inscreve duas vezes no mesmo evento.
 - **Inscrever e cancelar são transações:** a inscrição e o contador `enrolledCount` mudam juntos. Se dois alunos tentarem a última vaga ao mesmo tempo, o Firestore repete uma das tentativas, que encontra o evento lotado.
-- Na primeira execução, se a coleção `events` estiver vazia, o app grava 8 eventos de exemplo (`SampleEvents.kt`), um para cada curso.
+- Na primeira execução, se a coleção `events` estiver vazia, o app grava 8 eventos de exemplo (`SampleEvents.kt`), com pelo menos um evento de cada curso.
+
+### Dados no console do Firebase
+
+Contas criadas pela tela de Registro, em **Authentication > Usuários**:
+
+![Usuários registrados no Firebase Authentication](docs/images/firebase-auth-users.png)
+
+Perfil salvo no Firestore pelo Registro, na coleção `users`. O id do documento é o mesmo UID do Authentication:
+
+![Documento de um aluno na coleção users do Firestore](docs/images/firestore-users.png)
+
+Um dos eventos de exemplo na coleção `events`, com o curso e o tipo de acesso:
+
+![Documento de um evento na coleção events do Firestore](docs/images/firestore-events.png)
 
 ## Arquitetura
 
