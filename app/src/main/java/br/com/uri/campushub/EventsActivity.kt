@@ -45,6 +45,11 @@ class EventsActivity : AppCompatActivity() {
         applySystemBarsPadding()
 
         loadUserName()
+    }
+
+    // recarrega ao voltar dos detalhes, para as vagas aparecerem atualizadas
+    override fun onResume() {
+        super.onResume()
         loadEvents()
     }
 

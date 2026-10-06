@@ -31,6 +31,17 @@
     <string name="event_details">Detalhes do evento</string>
     <string name="about_event">Sobre o evento</string>
     <string name="event_not_found">Evento não encontrado</string>
+    <string name="remaining_spots">%1$d vagas restantes</string>
+    <string name="spots_of_capacity">%1$d de %2$d vagas disponíveis</string>
+    <string name="sold_out">Vagas esgotadas</string>
+    <string name="enroll">Inscrever-se</string>
+    <string name="cancel_enrollment">Cancelar inscrição</string>
+    <string name="enrolled_banner">Você está inscrito neste evento</string>
+    <string name="only_for_course">Exclusivo para alunos de %1$s</string>
+    <string name="enrolled_success">Inscrição confirmada!</string>
+    <string name="enrollment_canceled">Inscrição cancelada</string>
+    <string name="cancel_enrollment_question">Cancelar sua inscrição neste evento?</string>
+    <string name="keep_enrollment">Manter</string>
 
     <string-array name="courses">
         <item>@string/select_course</item>

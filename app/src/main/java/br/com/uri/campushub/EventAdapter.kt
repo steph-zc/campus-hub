@@ -39,7 +39,11 @@ class EventAdapter(
         holder.txtTitle.text = event.title
         holder.txtTime.text = event.time()
         holder.txtLocation.text = event.location
-        holder.txtCapacity.text = context.getString(R.string.capacity, event.capacity)
+        holder.txtCapacity.text = if (event.remainingSpots() > 0) {
+            context.getString(R.string.remaining_spots, event.remainingSpots())
+        } else {
+            context.getString(R.string.sold_out)
+        }
         EventChips.bind(holder.chipCourse, holder.chipAccess, event)
 
         holder.itemView.setOnClickListener { onClick(event) }

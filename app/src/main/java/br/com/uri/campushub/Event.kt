@@ -16,8 +16,15 @@ data class Event(
     // curso que organiza o evento, com os mesmos nomes da lista do cadastro
     val course: String = "",
     // false = só alunos do curso podem participar
-    val openToAll: Boolean = true
+    val openToAll: Boolean = true,
+    // quantos alunos já se inscreveram; muda a cada inscrição ou cancelamento
+    val enrolledCount: Int = 0
 ) {
+    fun remainingSpots() = (capacity - enrolledCount).coerceAtLeast(0)
+
+    // exclusivos só aceitam alunos do mesmo curso
+    fun acceptsCourse(userCourse: String) = openToAll || course == userCourse
+
     fun formattedDate() = format("dd/MM/yyyy 'às' HH:mm")
 
     // "terça-feira, 20 de outubro de 2026" com a primeira letra maiúscula

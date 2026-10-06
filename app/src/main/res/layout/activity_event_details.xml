@@ -103,6 +103,42 @@
 
             </com.google.android.material.card.MaterialCardView>
 
+            <!-- aparece só para quem já está inscrito -->
+            <TextView
+                android:id="@+id/txtEnrolled"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:background="@drawable/bg_enrolled_banner"
+                android:drawablePadding="12dp"
+                android:gravity="center_vertical"
+                android:padding="16dp"
+                android:text="@string/enrolled_banner"
+                android:textColor="@color/chip_open_text"
+                android:textStyle="bold"
+                android:visibility="gone"
+                app:drawableStartCompat="@drawable/ic_check_circle"
+                app:drawableTint="@color/chip_open_text" />
+
+            <!-- só um dos dois botões fica visível, conforme o aluno está inscrito ou não -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnEnroll"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:layout_marginTop="12dp"
+                android:text="@string/enroll"
+                app:cornerRadius="12dp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnCancelEnrollment"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:layout_marginTop="12dp"
+                android:text="@string/cancel_enrollment"
+                android:visibility="gone"
+                app:cornerRadius="12dp" />
+
             <!-- descrição completa -->
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
