@@ -46,6 +46,13 @@
     <string name="no_enrollments">Nenhuma inscrição ainda</string>
     <string name="no_enrollments_hint">Os eventos em que você se inscrever vão aparecer aqui.</string>
     <string name="browse_events">Ver eventos</string>
+    <string name="profile">Meu perfil</string>
+    <string name="edit_profile">Editar dados</string>
+    <string name="course">Curso</string>
+    <string name="save">Salvar alterações</string>
+    <string name="profile_saved">Perfil atualizado!</string>
+    <string name="fill_name">Preencha o nome</string>
+    <string name="logout_account">Sair da conta</string>
 
     <string-array name="courses">
         <item>@string/select_course</item>

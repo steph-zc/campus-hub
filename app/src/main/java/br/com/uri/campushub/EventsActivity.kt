@@ -39,17 +39,17 @@ class EventsActivity : AppCompatActivity() {
         progressBar = findViewById(R.id.progressBar)
         rvEvents = findViewById(R.id.rvEvents)
 
-        // a Toolbar do layout passa a ser a barra da tela, com o menu de Sair
+        // a Toolbar do layout passa a ser a barra da tela, com o menu
         setSupportActionBar(toolbar)
         rvEvents.layoutManager = LinearLayoutManager(this)
         applySystemBarsPadding()
-
-        loadUserName()
     }
 
-    // recarrega ao voltar dos detalhes, para as vagas aparecerem atualizadas
+    // recarrega ao voltar de outra tela: as vagas mudam com as inscrições
+    // e o nome pode ter sido trocado no perfil
     override fun onResume() {
         super.onResume()
+        loadUserName()
         loadEvents()
     }
 
@@ -114,6 +114,10 @@ class EventsActivity : AppCompatActivity() {
         when (item.itemId) {
             R.id.menuMyEvents -> {
                 startActivity(Intent(this, MyEventsActivity::class.java))
+                return true
+            }
+            R.id.menuProfile -> {
+                startActivity(Intent(this, ProfileActivity::class.java))
                 return true
             }
             R.id.menuLogout -> {
