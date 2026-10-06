@@ -34,6 +34,10 @@
             android:name=".EventDetailsActivity"
             android:theme="@style/Theme.CampusHub.NoActionBar" />
 
+        <activity
+            android:name=".MyEventsActivity"
+            android:theme="@style/Theme.CampusHub.NoActionBar" />
+
     </application>
 
 </manifest>

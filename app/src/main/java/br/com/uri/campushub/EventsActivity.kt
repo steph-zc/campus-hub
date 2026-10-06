@@ -111,9 +111,15 @@ class EventsActivity : AppCompatActivity() {
     }
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
-        if (item.itemId == R.id.menuLogout) {
-            logout()
-            return true
+        when (item.itemId) {
+            R.id.menuMyEvents -> {
+                startActivity(Intent(this, MyEventsActivity::class.java))
+                return true
+            }
+            R.id.menuLogout -> {
+                logout()
+                return true
+            }
         }
         return super.onOptionsItemSelected(item)
     }

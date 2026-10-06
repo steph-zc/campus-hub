@@ -42,6 +42,10 @@
     <string name="enrollment_canceled">Inscrição cancelada</string>
     <string name="cancel_enrollment_question">Cancelar sua inscrição neste evento?</string>
     <string name="keep_enrollment">Manter</string>
+    <string name="my_events">Meus eventos</string>
+    <string name="no_enrollments">Nenhuma inscrição ainda</string>
+    <string name="no_enrollments_hint">Os eventos em que você se inscrever vão aparecer aqui.</string>
+    <string name="browse_events">Ver eventos</string>
 
     <string-array name="courses">
         <item>@string/select_course</item>
