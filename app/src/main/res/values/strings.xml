@@ -34,6 +34,7 @@
     <string name="remaining_spots">%1$d vagas restantes</string>
     <string name="spots_of_capacity">%1$d de %2$d vagas disponíveis</string>
     <string name="sold_out">Vagas esgotadas</string>
+    <string name="event_ended">Evento encerrado</string>
     <string name="enroll">Inscrever-se</string>
     <string name="cancel_enrollment">Cancelar inscrição</string>
     <string name="enrolled_banner">Você está inscrito neste evento</string>

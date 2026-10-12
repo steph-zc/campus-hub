@@ -34,6 +34,7 @@ class EventDetailsActivity : AppCompatActivity() {
     private lateinit var progressBar: ProgressBar
     private lateinit var chipCourse: Chip
     private lateinit var chipAccess: Chip
+    private lateinit var txtCategory: TextView
     private lateinit var txtTitle: TextView
     private lateinit var txtDate: TextView
     private lateinit var txtTime: TextView
@@ -61,6 +62,7 @@ class EventDetailsActivity : AppCompatActivity() {
         progressBar = findViewById(R.id.progressBar)
         chipCourse = findViewById(R.id.chipCourse)
         chipAccess = findViewById(R.id.chipAccess)
+        txtCategory = findViewById(R.id.txtCategory)
         txtTitle = findViewById(R.id.txtTitle)
         txtDate = findViewById(R.id.txtDate)
         txtTime = findViewById(R.id.txtTime)
@@ -126,6 +128,8 @@ class EventDetailsActivity : AppCompatActivity() {
 
     private fun showEvent(event: Event, userCourse: String, isEnrolled: Boolean) {
         EventChips.bind(chipCourse, chipAccess, event)
+        txtCategory.text = event.category
+        txtCategory.visibility = if (event.category.isEmpty()) View.GONE else View.VISIBLE
         txtTitle.text = event.title
         txtDate.text = event.fullDate()
         txtTime.text = event.time()
@@ -141,11 +145,16 @@ class EventDetailsActivity : AppCompatActivity() {
 
     private fun showEnrollmentState(event: Event, userCourse: String, isEnrolled: Boolean) {
         txtEnrolled.visibility = if (isEnrolled) View.VISIBLE else View.GONE
-        btnCancelEnrollment.visibility = if (isEnrolled) View.VISIBLE else View.GONE
+        // depois que o evento acontece não dá mais para cancelar
+        btnCancelEnrollment.visibility = if (isEnrolled && !event.hasEnded()) View.VISIBLE else View.GONE
         btnEnroll.visibility = if (isEnrolled) View.GONE else View.VISIBLE
 
         // o botão fica desativado mostrando o motivo
         when {
+            event.hasEnded() -> {
+                btnEnroll.isEnabled = false
+                btnEnroll.setText(R.string.event_ended)
+            }
             !event.acceptsCourse(userCourse) -> {
                 btnEnroll.isEnabled = false
                 btnEnroll.text = getString(R.string.only_for_course, event.course)

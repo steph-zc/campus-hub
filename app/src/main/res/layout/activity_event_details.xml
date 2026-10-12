@@ -70,10 +70,15 @@
                     </com.google.android.material.chip.ChipGroup>
 
                     <TextView
+                        android:id="@+id/txtCategory"
+                        style="@style/Widget.CampusHub.CategoryLabel"
+                        android:layout_marginTop="16dp" />
+
+                    <TextView
                         android:id="@+id/txtTitle"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="12dp"
+                        android:layout_marginTop="4dp"
                         android:layout_marginBottom="8dp"
                         android:textColor="?android:attr/textColorPrimary"
                         android:textSize="24sp"

@@ -86,7 +86,10 @@ class EventsActivity : AppCompatActivity() {
                     return@addOnSuccessListener
                 }
 
-                val events = result.toObjects(Event::class.java)
+                // próximos primeiro, do mais perto para o mais longe;
+                // depois os encerrados, do mais recente para o mais antigo
+                val (ended, upcoming) = result.toObjects(Event::class.java).partition { it.hasEnded() }
+                val events = upcoming + ended.reversed()
                 rvEvents.adapter = EventAdapter(events) { event -> openDetails(event) }
                 progressBar.visibility = View.GONE
             }

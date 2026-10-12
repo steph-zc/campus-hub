@@ -3,6 +3,7 @@ package br.com.uri.campushub
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.DocumentId
 import java.text.SimpleDateFormat
+import java.util.Date
 import java.util.Locale
 
 // os valores padrão permitem que o Firestore monte o objeto sozinho com toObject()
@@ -18,9 +19,14 @@ data class Event(
     // false = só alunos do curso podem participar
     val openToAll: Boolean = true,
     // quantos alunos já se inscreveram; muda a cada inscrição ou cancelamento
-    val enrolledCount: Int = 0
+    val enrolledCount: Int = 0,
+    // tipo do evento: Palestra, Workshop, Seminário...
+    val category: String = ""
 ) {
     fun remainingSpots() = (capacity - enrolledCount).coerceAtLeast(0)
+
+    // não pode começar com "is": o Firestore acharia que é um campo e gravaria no documento
+    fun hasEnded() = date != null && date.toDate().before(Date())
 
     // exclusivos só aceitam alunos do mesmo curso
     fun acceptsCourse(userCourse: String) = openToAll || course == userCourse

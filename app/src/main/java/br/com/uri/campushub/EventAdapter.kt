@@ -17,6 +17,8 @@ class EventAdapter(
     class EventViewHolder(view: View) : RecyclerView.ViewHolder(view) {
         val txtDay: TextView = view.findViewById(R.id.txtDay)
         val txtMonth: TextView = view.findViewById(R.id.txtMonth)
+        val dateBadge: View = view.findViewById(R.id.dateBadge)
+        val txtCategory: TextView = view.findViewById(R.id.txtCategory)
         val txtTitle: TextView = view.findViewById(R.id.txtTitle)
         val txtTime: TextView = view.findViewById(R.id.txtTime)
         val txtLocation: TextView = view.findViewById(R.id.txtLocation)
@@ -36,14 +38,19 @@ class EventAdapter(
 
         holder.txtDay.text = event.day()
         holder.txtMonth.text = event.shortMonth()
+        holder.txtCategory.text = event.category
+        holder.txtCategory.visibility = if (event.category.isEmpty()) View.GONE else View.VISIBLE
         holder.txtTitle.text = event.title
         holder.txtTime.text = event.time()
         holder.txtLocation.text = event.location
-        holder.txtCapacity.text = if (event.remainingSpots() > 0) {
-            context.getString(R.string.remaining_spots, event.remainingSpots())
-        } else {
-            context.getString(R.string.sold_out)
+        holder.txtCapacity.text = when {
+            event.hasEnded() -> context.getString(R.string.event_ended)
+            event.remainingSpots() > 0 -> context.getString(R.string.remaining_spots, event.remainingSpots())
+            else -> context.getString(R.string.sold_out)
         }
+
+        // eventos encerrados ficam com o bloco de data apagado
+        holder.dateBadge.alpha = if (event.hasEnded()) 0.4f else 1f
         EventChips.bind(holder.chipCourse, holder.chipAccess, event)
 
         holder.itemView.setOnClickListener { onClick(event) }
