@@ -4,6 +4,7 @@ import android.os.Bundle
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
+import android.view.inputmethod.InputMethodManager
 import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
@@ -12,17 +13,23 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.widget.NestedScrollView
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import com.google.android.gms.tasks.Tasks
 import com.google.android.material.appbar.AppBarLayout
 import com.google.android.material.appbar.MaterialToolbar
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.chip.Chip
+import com.google.android.material.textfield.TextInputEditText
+import com.google.android.material.textfield.TextInputLayout
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.CollectionReference
 import com.google.firebase.firestore.DocumentReference
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreException
+import com.google.firebase.firestore.Query
 
 class EventDetailsActivity : AppCompatActivity() {
 
@@ -46,6 +53,11 @@ class EventDetailsActivity : AppCompatActivity() {
     private lateinit var btnEnroll: MaterialButton
     private lateinit var btnCancelEnrollment: MaterialButton
     private lateinit var txtDescription: TextView
+    private lateinit var txtCommentsTitle: TextView
+    private lateinit var layoutComment: TextInputLayout
+    private lateinit var edtComment: TextInputEditText
+    private lateinit var txtNoComments: TextView
+    private lateinit var rvComments: RecyclerView
 
     private val auth = FirebaseAuth.getInstance()
     private val db = FirebaseFirestore.getInstance()
@@ -54,9 +66,13 @@ class EventDetailsActivity : AppCompatActivity() {
     private lateinit var userRef: DocumentReference
     private lateinit var enrollmentRef: DocumentReference
     private lateinit var favoriteRef: DocumentReference
+    private lateinit var commentsRef: CollectionReference
 
     // null enquanto os dados não chegaram; o coração só aparece depois
     private var isFavorite: Boolean? = null
+
+    // nome do aluno logado, gravado como autor dos comentários dele
+    private var userName = ""
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -78,6 +94,13 @@ class EventDetailsActivity : AppCompatActivity() {
         btnEnroll = findViewById(R.id.btnEnroll)
         btnCancelEnrollment = findViewById(R.id.btnCancelEnrollment)
         txtDescription = findViewById(R.id.txtDescription)
+        txtCommentsTitle = findViewById(R.id.txtCommentsTitle)
+        layoutComment = findViewById(R.id.layoutComment)
+        edtComment = findViewById(R.id.edtComment)
+        txtNoComments = findViewById(R.id.txtNoComments)
+        rvComments = findViewById(R.id.rvComments)
+
+        rvComments.layoutManager = LinearLayoutManager(this)
 
         // seta de voltar na barra
         setSupportActionBar(toolbar)
@@ -92,11 +115,15 @@ class EventDetailsActivity : AppCompatActivity() {
         enrollmentRef = userRef.collection("enrollments").document(eventId)
         // favorito é separado da inscrição: favoritar não reserva vaga
         favoriteRef = userRef.collection("favorites").document(eventId)
+        // os comentários ficam dentro do evento, visíveis para todos os alunos
+        commentsRef = eventRef.collection("comments")
 
         btnEnroll.setOnClickListener { enroll() }
         btnCancelEnrollment.setOnClickListener { confirmCancel() }
+        layoutComment.setEndIconOnClickListener { postComment() }
 
         loadData()
+        loadComments()
     }
 
     override fun onSupportNavigateUp(): Boolean {
@@ -183,6 +210,7 @@ class EventDetailsActivity : AppCompatActivity() {
                     return@addOnSuccessListener
                 }
                 val userCourse = results[1].getString("course") ?: ""
+                userName = results[1].getString("name") ?: ""
                 val isEnrolled = results[2].exists()
                 isFavorite = results[3].exists()
                 invalidateOptionsMenu()
@@ -297,6 +325,57 @@ class EventDetailsActivity : AppCompatActivity() {
                 loadData()
             }
             .addOnFailureListener { error -> showError(error) }
+    }
+
+    // mais novos primeiro, logo abaixo do campo de escrever
+    private fun loadComments() {
+        commentsRef.orderBy("createdAt", Query.Direction.DESCENDING).get()
+            .addOnSuccessListener { result ->
+                val comments = result.toObjects(Comment::class.java)
+                rvComments.adapter = CommentAdapter(comments)
+                txtCommentsTitle.text = getString(R.string.comments_count, comments.size)
+                txtNoComments.visibility = if (comments.isEmpty()) View.VISIBLE else View.GONE
+            }
+            .addOnFailureListener { error ->
+                Toast.makeText(this, error.message, Toast.LENGTH_LONG).show()
+            }
+    }
+
+    private fun postComment() {
+        val text = edtComment.text.toString().trim()
+        if (text.isEmpty()) {
+            Toast.makeText(this, R.string.empty_comment, Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        // evita publicar duas vezes com toques repetidos
+        layoutComment.isEnabled = false
+
+        val comment = hashMapOf(
+            "userId" to auth.currentUser!!.uid,
+            "authorName" to userName,
+            "text" to text,
+            // a data vem do servidor, não do relógio do celular
+            "createdAt" to FieldValue.serverTimestamp()
+        )
+
+        commentsRef.add(comment)
+            .addOnSuccessListener {
+                layoutComment.isEnabled = true
+                edtComment.text = null
+                hideKeyboard()
+                loadComments()
+            }
+            .addOnFailureListener { error ->
+                layoutComment.isEnabled = true
+                Toast.makeText(this, error.message, Toast.LENGTH_LONG).show()
+            }
+    }
+
+    private fun hideKeyboard() {
+        val keyboard = getSystemService(InputMethodManager::class.java)
+        keyboard.hideSoftInputFromWindow(edtComment.windowToken, 0)
+        edtComment.clearFocus()
     }
 
     private fun showError(error: Exception) {

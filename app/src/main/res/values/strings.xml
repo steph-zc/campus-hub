@@ -40,6 +40,12 @@
     <string name="favorite_added">Adicionado aos favoritos</string>
     <string name="favorite_removed">Removido dos favoritos</string>
     <string name="my_favorites">Meus favoritos</string>
+    <string name="comments">Comentários</string>
+    <string name="comments_count">Comentários (%1$d)</string>
+    <string name="write_comment">Escreva um comentário</string>
+    <string name="send_comment">Enviar comentário</string>
+    <string name="no_comments">Nenhum comentário ainda. Seja o primeiro!</string>
+    <string name="empty_comment">Escreva algo antes de enviar</string>
     <string name="no_favorites">Nenhum favorito ainda</string>
     <string name="no_favorites_hint">Toque no coração nos detalhes de um evento para guardá-lo aqui.</string>
     <string name="enroll">Inscrever-se</string>
