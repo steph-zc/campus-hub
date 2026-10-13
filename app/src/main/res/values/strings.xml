@@ -35,6 +35,10 @@
     <string name="spots_of_capacity">%1$d de %2$d vagas disponíveis</string>
     <string name="sold_out">Vagas esgotadas</string>
     <string name="event_ended">Evento encerrado</string>
+    <string name="add_favorite">Favoritar</string>
+    <string name="remove_favorite">Remover dos favoritos</string>
+    <string name="favorite_added">Adicionado aos favoritos</string>
+    <string name="favorite_removed">Removido dos favoritos</string>
     <string name="enroll">Inscrever-se</string>
     <string name="cancel_enrollment">Cancelar inscrição</string>
     <string name="enrolled_banner">Você está inscrito neste evento</string>

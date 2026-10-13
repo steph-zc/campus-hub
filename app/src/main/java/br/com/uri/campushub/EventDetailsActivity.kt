@@ -1,6 +1,8 @@
 package br.com.uri.campushub
 
 import android.os.Bundle
+import android.view.Menu
+import android.view.MenuItem
 import android.view.View
 import android.widget.ProgressBar
 import android.widget.TextView
@@ -51,6 +53,10 @@ class EventDetailsActivity : AppCompatActivity() {
     private lateinit var eventRef: DocumentReference
     private lateinit var userRef: DocumentReference
     private lateinit var enrollmentRef: DocumentReference
+    private lateinit var favoriteRef: DocumentReference
+
+    // null enquanto os dados não chegaram; o coração só aparece depois
+    private var isFavorite: Boolean? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -84,6 +90,8 @@ class EventDetailsActivity : AppCompatActivity() {
         userRef = db.collection("users").document(uid)
         // a inscrição usa o id do evento, então cada aluno só tem uma por evento
         enrollmentRef = userRef.collection("enrollments").document(eventId)
+        // favorito é separado da inscrição: favoritar não reserva vaga
+        favoriteRef = userRef.collection("favorites").document(eventId)
 
         btnEnroll.setOnClickListener { enroll() }
         btnCancelEnrollment.setOnClickListener { confirmCancel() }
@@ -96,6 +104,62 @@ class EventDetailsActivity : AppCompatActivity() {
         return true
     }
 
+    override fun onCreateOptionsMenu(menu: Menu): Boolean {
+        menuInflater.inflate(R.menu.menu_event_details, menu)
+        return true
+    }
+
+    // chamado de novo a cada invalidateOptionsMenu(), para o coração acompanhar o estado
+    override fun onPrepareOptionsMenu(menu: Menu): Boolean {
+        val item = menu.findItem(R.id.menuFavorite)
+        val favorite = isFavorite
+        item.isVisible = favorite != null
+        if (favorite == true) {
+            item.setIcon(R.drawable.ic_favorite)
+            item.setTitle(R.string.remove_favorite)
+        } else {
+            item.setIcon(R.drawable.ic_favorite_border)
+            item.setTitle(R.string.add_favorite)
+        }
+        return super.onPrepareOptionsMenu(menu)
+    }
+
+    override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        if (item.itemId == R.id.menuFavorite) {
+            toggleFavorite()
+            return true
+        }
+        return super.onOptionsItemSelected(item)
+    }
+
+    private fun toggleFavorite() {
+        val wasFavorite = isFavorite ?: return
+
+        // troca o ícone na hora; se o Firestore falhar, volta ao que era
+        isFavorite = !wasFavorite
+        invalidateOptionsMenu()
+
+        val task = if (wasFavorite) {
+            favoriteRef.delete()
+        } else {
+            favoriteRef.set(hashMapOf(
+                "eventId" to eventRef.id,
+                "favoritedAt" to FieldValue.serverTimestamp()
+            ))
+        }
+
+        task
+            .addOnSuccessListener {
+                val message = if (wasFavorite) R.string.favorite_removed else R.string.favorite_added
+                Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+            }
+            .addOnFailureListener { error ->
+                isFavorite = wasFavorite
+                invalidateOptionsMenu()
+                Toast.makeText(this, error.message, Toast.LENGTH_LONG).show()
+            }
+    }
+
     private fun applySystemBarsPadding() {
         val space = resources.getDimensionPixelSize(R.dimen.list_padding)
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.root)) { _, insets ->
@@ -106,9 +170,11 @@ class EventDetailsActivity : AppCompatActivity() {
         }
     }
 
-    // busca o evento, o curso do aluno e a inscrição ao mesmo tempo
+    // busca o evento, o curso do aluno, a inscrição e o favorito ao mesmo tempo
     private fun loadData() {
-        Tasks.whenAllSuccess<DocumentSnapshot>(eventRef.get(), userRef.get(), enrollmentRef.get())
+        Tasks.whenAllSuccess<DocumentSnapshot>(
+            eventRef.get(), userRef.get(), enrollmentRef.get(), favoriteRef.get()
+        )
             .addOnSuccessListener { results ->
                 val event = results[0].toObject(Event::class.java)
                 if (event == null) {
@@ -118,6 +184,8 @@ class EventDetailsActivity : AppCompatActivity() {
                 }
                 val userCourse = results[1].getString("course") ?: ""
                 val isEnrolled = results[2].exists()
+                isFavorite = results[3].exists()
+                invalidateOptionsMenu()
                 showEvent(event, userCourse, isEnrolled)
             }
             .addOnFailureListener { error ->
