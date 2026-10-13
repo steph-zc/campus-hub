@@ -46,6 +46,14 @@
     <string name="send_comment">Enviar comentário</string>
     <string name="no_comments">Nenhum comentário ainda. Seja o primeiro!</string>
     <string name="empty_comment">Escreva algo antes de enviar</string>
+    <string name="comment_options">Opções do comentário</string>
+    <string name="comment_edited">%1$s · editado</string>
+    <string name="edit">Editar</string>
+    <string name="delete">Excluir</string>
+    <string name="edit_comment">Editar comentário</string>
+    <string name="comment_updated">Comentário atualizado</string>
+    <string name="delete_comment_question">Excluir este comentário? Essa ação não pode ser desfeita.</string>
+    <string name="comment_deleted">Comentário excluído</string>
     <string name="no_favorites">Nenhum favorito ainda</string>
     <string name="no_favorites_hint">Toque no coração nos detalhes de um evento para guardá-lo aqui.</string>
     <string name="enroll">Inscrever-se</string>

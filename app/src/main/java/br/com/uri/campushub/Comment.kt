@@ -13,7 +13,9 @@ data class Comment(
     // o nome fica gravado no comentário para não precisar buscar o perfil de cada autor
     val authorName: String = "",
     val text: String = "",
-    val createdAt: Timestamp? = null
+    val createdAt: Timestamp? = null,
+    // preenchido na primeira edição; null = nunca foi editado
+    val editedAt: Timestamp? = null
 ) {
     fun formattedDate(): String {
         val format = SimpleDateFormat("dd/MM/yyyy 'às' HH:mm", Locale.forLanguageTag("pt-BR"))

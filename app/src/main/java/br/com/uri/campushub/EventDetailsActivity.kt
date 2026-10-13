@@ -332,7 +332,12 @@ class EventDetailsActivity : AppCompatActivity() {
         commentsRef.orderBy("createdAt", Query.Direction.DESCENDING).get()
             .addOnSuccessListener { result ->
                 val comments = result.toObjects(Comment::class.java)
-                rvComments.adapter = CommentAdapter(comments)
+                rvComments.adapter = CommentAdapter(
+                    comments,
+                    auth.currentUser!!.uid,
+                    onEdit = { comment -> showEditDialog(comment) },
+                    onDelete = { comment -> confirmDelete(comment) }
+                )
                 txtCommentsTitle.text = getString(R.string.comments_count, comments.size)
                 txtNoComments.visibility = if (comments.isEmpty()) View.VISIBLE else View.GONE
             }
@@ -368,6 +373,64 @@ class EventDetailsActivity : AppCompatActivity() {
             }
             .addOnFailureListener { error ->
                 layoutComment.isEnabled = true
+                Toast.makeText(this, error.message, Toast.LENGTH_LONG).show()
+            }
+    }
+
+    private fun showEditDialog(comment: Comment) {
+        val view = layoutInflater.inflate(R.layout.dialog_edit_comment, null)
+        val edtEditComment = view.findViewById<TextInputEditText>(R.id.edtEditComment)
+        edtEditComment.setText(comment.text)
+        // cursor no fim do texto, pronto para continuar escrevendo
+        edtEditComment.setSelection(comment.text.length)
+
+        AlertDialog.Builder(this)
+            .setTitle(R.string.edit_comment)
+            .setView(view)
+            .setPositiveButton(R.string.save) { _, _ ->
+                updateComment(comment, edtEditComment.text.toString().trim())
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
+    }
+
+    private fun updateComment(comment: Comment, newText: String) {
+        if (newText.isEmpty()) {
+            Toast.makeText(this, R.string.empty_comment, Toast.LENGTH_SHORT).show()
+            return
+        }
+        // nada mudou, não precisa gravar nem marcar como editado
+        if (newText == comment.text) return
+
+        val changes = mapOf(
+            "text" to newText,
+            "editedAt" to FieldValue.serverTimestamp()
+        )
+        commentsRef.document(comment.id).update(changes)
+            .addOnSuccessListener {
+                Toast.makeText(this, R.string.comment_updated, Toast.LENGTH_SHORT).show()
+                loadComments()
+            }
+            .addOnFailureListener { error ->
+                Toast.makeText(this, error.message, Toast.LENGTH_LONG).show()
+            }
+    }
+
+    private fun confirmDelete(comment: Comment) {
+        AlertDialog.Builder(this)
+            .setMessage(R.string.delete_comment_question)
+            .setPositiveButton(R.string.delete) { _, _ -> deleteComment(comment) }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
+    }
+
+    private fun deleteComment(comment: Comment) {
+        commentsRef.document(comment.id).delete()
+            .addOnSuccessListener {
+                Toast.makeText(this, R.string.comment_deleted, Toast.LENGTH_SHORT).show()
+                loadComments()
+            }
+            .addOnFailureListener { error ->
                 Toast.makeText(this, error.message, Toast.LENGTH_LONG).show()
             }
     }
