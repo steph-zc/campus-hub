@@ -39,6 +39,9 @@
     <string name="remove_favorite">Remover dos favoritos</string>
     <string name="favorite_added">Adicionado aos favoritos</string>
     <string name="favorite_removed">Removido dos favoritos</string>
+    <string name="my_favorites">Meus favoritos</string>
+    <string name="no_favorites">Nenhum favorito ainda</string>
+    <string name="no_favorites_hint">Toque no coração nos detalhes de um evento para guardá-lo aqui.</string>
     <string name="enroll">Inscrever-se</string>
     <string name="cancel_enrollment">Cancelar inscrição</string>
     <string name="enrolled_banner">Você está inscrito neste evento</string>

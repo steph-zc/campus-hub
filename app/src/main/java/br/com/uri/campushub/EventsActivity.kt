@@ -116,7 +116,11 @@ class EventsActivity : AppCompatActivity() {
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         when (item.itemId) {
             R.id.menuMyEvents -> {
-                startActivity(Intent(this, MyEventsActivity::class.java))
+                openMyList(MyEventsActivity.LIST_ENROLLMENTS)
+                return true
+            }
+            R.id.menuFavorites -> {
+                openMyList(MyEventsActivity.LIST_FAVORITES)
                 return true
             }
             R.id.menuProfile -> {
@@ -129,6 +133,13 @@ class EventsActivity : AppCompatActivity() {
             }
         }
         return super.onOptionsItemSelected(item)
+    }
+
+    // a mesma tela mostra as inscrições ou os favoritos
+    private fun openMyList(list: String) {
+        val intent = Intent(this, MyEventsActivity::class.java)
+        intent.putExtra(MyEventsActivity.EXTRA_LIST, list)
+        startActivity(intent)
     }
 
     private fun logout() {
