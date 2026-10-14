@@ -54,6 +54,11 @@
     <string name="comment_updated">Comentário atualizado</string>
     <string name="delete_comment_question">Excluir este comentário? Essa ação não pode ser desfeita.</string>
     <string name="comment_deleted">Comentário excluído</string>
+    <string name="attended_banner">Você se inscreveu neste evento</string>
+    <string name="your_rating">Sua avaliação</string>
+    <string name="rating_hint">Toque nas estrelas para dar uma nota de 1 a 5</string>
+    <string name="your_rating_value">Sua nota: %1$d de 5. Toque para alterar.</string>
+    <string name="rating_saved">Avaliação salva</string>
     <string name="no_favorites">Nenhum favorito ainda</string>
     <string name="no_favorites_hint">Toque no coração nos detalhes de um evento para guardá-lo aqui.</string>
     <string name="enroll">Inscrever-se</string>

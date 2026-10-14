@@ -144,6 +144,54 @@
                 android:visibility="gone"
                 app:cornerRadius="12dp" />
 
+            <!-- só aparece para quem estava inscrito, depois que o evento termina -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/cardRating"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:visibility="gone"
+                app:cardCornerRadius="12dp"
+                app:cardElevation="2dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_horizontal"
+                    android:orientation="vertical"
+                    android:padding="20dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/your_rating"
+                        android:textColor="?android:attr/textColorPrimary"
+                        android:textSize="18sp"
+                        android:textStyle="bold" />
+
+                    <!-- stepSize 1 = só notas inteiras, de 1 a 5 -->
+                    <RatingBar
+                        android:id="@+id/ratingBar"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:numStars="5"
+                        android:progressBackgroundTint="?android:attr/textColorSecondary"
+                        android:progressTint="@color/ui_accent"
+                        android:stepSize="1" />
+
+                    <TextView
+                        android:id="@+id/txtRatingHint"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:gravity="center"
+                        android:text="@string/rating_hint" />
+
+                </LinearLayout>
+
+            </com.google.android.material.card.MaterialCardView>
+
             <!-- descrição completa -->
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"

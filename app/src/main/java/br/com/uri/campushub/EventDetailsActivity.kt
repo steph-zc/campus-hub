@@ -6,6 +6,7 @@ import android.view.MenuItem
 import android.view.View
 import android.view.inputmethod.InputMethodManager
 import android.widget.ProgressBar
+import android.widget.RatingBar
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
@@ -19,6 +20,7 @@ import com.google.android.gms.tasks.Tasks
 import com.google.android.material.appbar.AppBarLayout
 import com.google.android.material.appbar.MaterialToolbar
 import com.google.android.material.button.MaterialButton
+import com.google.android.material.card.MaterialCardView
 import com.google.android.material.chip.Chip
 import com.google.android.material.textfield.TextInputEditText
 import com.google.android.material.textfield.TextInputLayout
@@ -52,6 +54,9 @@ class EventDetailsActivity : AppCompatActivity() {
     private lateinit var txtEnrolled: TextView
     private lateinit var btnEnroll: MaterialButton
     private lateinit var btnCancelEnrollment: MaterialButton
+    private lateinit var cardRating: MaterialCardView
+    private lateinit var ratingBar: RatingBar
+    private lateinit var txtRatingHint: TextView
     private lateinit var txtDescription: TextView
     private lateinit var txtCommentsTitle: TextView
     private lateinit var layoutComment: TextInputLayout
@@ -67,6 +72,7 @@ class EventDetailsActivity : AppCompatActivity() {
     private lateinit var enrollmentRef: DocumentReference
     private lateinit var favoriteRef: DocumentReference
     private lateinit var commentsRef: CollectionReference
+    private lateinit var ratingRef: DocumentReference
 
     // null enquanto os dados não chegaram; o coração só aparece depois
     private var isFavorite: Boolean? = null
@@ -93,6 +99,9 @@ class EventDetailsActivity : AppCompatActivity() {
         txtEnrolled = findViewById(R.id.txtEnrolled)
         btnEnroll = findViewById(R.id.btnEnroll)
         btnCancelEnrollment = findViewById(R.id.btnCancelEnrollment)
+        cardRating = findViewById(R.id.cardRating)
+        ratingBar = findViewById(R.id.ratingBar)
+        txtRatingHint = findViewById(R.id.txtRatingHint)
         txtDescription = findViewById(R.id.txtDescription)
         txtCommentsTitle = findViewById(R.id.txtCommentsTitle)
         layoutComment = findViewById(R.id.layoutComment)
@@ -117,10 +126,17 @@ class EventDetailsActivity : AppCompatActivity() {
         favoriteRef = userRef.collection("favorites").document(eventId)
         // os comentários ficam dentro do evento, visíveis para todos os alunos
         commentsRef = eventRef.collection("comments")
+        // o id da avaliação é o uid: cada aluno tem no máximo uma por evento
+        ratingRef = eventRef.collection("ratings").document(uid)
 
         btnEnroll.setOnClickListener { enroll() }
         btnCancelEnrollment.setOnClickListener { confirmCancel() }
         layoutComment.setEndIconOnClickListener { postComment() }
+
+        // fromUser separa o toque do aluno de quando o código preenche a nota salva
+        ratingBar.setOnRatingBarChangeListener { _, rating, fromUser ->
+            if (fromUser) saveRating(rating.toInt())
+        }
 
         loadData()
         loadComments()
@@ -197,10 +213,10 @@ class EventDetailsActivity : AppCompatActivity() {
         }
     }
 
-    // busca o evento, o curso do aluno, a inscrição e o favorito ao mesmo tempo
+    // busca o evento, o curso do aluno, a inscrição, o favorito e a avaliação ao mesmo tempo
     private fun loadData() {
         Tasks.whenAllSuccess<DocumentSnapshot>(
-            eventRef.get(), userRef.get(), enrollmentRef.get(), favoriteRef.get()
+            eventRef.get(), userRef.get(), enrollmentRef.get(), favoriteRef.get(), ratingRef.get()
         )
             .addOnSuccessListener { results ->
                 val event = results[0].toObject(Event::class.java)
@@ -213,8 +229,11 @@ class EventDetailsActivity : AppCompatActivity() {
                 userName = results[1].getString("name") ?: ""
                 val isEnrolled = results[2].exists()
                 isFavorite = results[3].exists()
+                // 0 = ainda não avaliou
+                val myRating = results[4].getLong("value")?.toInt() ?: 0
                 invalidateOptionsMenu()
                 showEvent(event, userCourse, isEnrolled)
+                showRatingState(event, isEnrolled, myRating)
             }
             .addOnFailureListener { error ->
                 Toast.makeText(this, error.message, Toast.LENGTH_LONG).show()
@@ -239,8 +258,50 @@ class EventDetailsActivity : AppCompatActivity() {
         scrollContent.visibility = View.VISIBLE
     }
 
+    // avaliar exige as duas coisas: ter se inscrito e o evento já ter acontecido
+    private fun showRatingState(event: Event, isEnrolled: Boolean, myRating: Int) {
+        if (!isEnrolled || !event.hasEnded()) {
+            cardRating.visibility = View.GONE
+            return
+        }
+        cardRating.visibility = View.VISIBLE
+        ratingBar.rating = myRating.toFloat()
+        showRatingHint(myRating)
+    }
+
+    private fun showRatingHint(rating: Int) {
+        txtRatingHint.text = if (rating == 0) {
+            getString(R.string.rating_hint)
+        } else {
+            getString(R.string.your_rating_value, rating)
+        }
+    }
+
+    private fun saveRating(stars: Int) {
+        // o RatingBar deixa arrastar até 0, mas a nota mínima é 1
+        val value = stars.coerceAtLeast(1)
+        if (stars < 1) ratingBar.rating = 1f
+
+        val rating = hashMapOf(
+            "userId" to auth.currentUser!!.uid,
+            "value" to value,
+            "updatedAt" to FieldValue.serverTimestamp()
+        )
+
+        // set no mesmo documento: a primeira vez cria, as próximas trocam a nota
+        ratingRef.set(rating)
+            .addOnSuccessListener {
+                showRatingHint(value)
+                Toast.makeText(this, R.string.rating_saved, Toast.LENGTH_SHORT).show()
+            }
+            .addOnFailureListener { error ->
+                Toast.makeText(this, error.message, Toast.LENGTH_LONG).show()
+            }
+    }
+
     private fun showEnrollmentState(event: Event, userCourse: String, isEnrolled: Boolean) {
         txtEnrolled.visibility = if (isEnrolled) View.VISIBLE else View.GONE
+        txtEnrolled.setText(if (event.hasEnded()) R.string.attended_banner else R.string.enrolled_banner)
         // depois que o evento acontece não dá mais para cancelar
         btnCancelEnrollment.visibility = if (isEnrolled && !event.hasEnded()) View.VISIBLE else View.GONE
         btnEnroll.visibility = if (isEnrolled) View.GONE else View.VISIBLE
