@@ -18,6 +18,8 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.appbar.AppBarLayout
 import com.google.android.material.appbar.MaterialToolbar
+import com.google.android.material.chip.Chip
+import com.google.android.material.chip.ChipGroup
 import com.google.android.material.textfield.TextInputEditText
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
@@ -31,6 +33,8 @@ class EventsActivity : AppCompatActivity() {
     private lateinit var progressBar: ProgressBar
     private lateinit var rvEvents: RecyclerView
     private lateinit var edtSearch: TextInputEditText
+    private lateinit var groupStatus: ChipGroup
+    private lateinit var groupCategory: ChipGroup
     private lateinit var txtNoResults: TextView
 
     private val auth = FirebaseAuth.getInstance()
@@ -49,6 +53,8 @@ class EventsActivity : AppCompatActivity() {
         progressBar = findViewById(R.id.progressBar)
         rvEvents = findViewById(R.id.rvEvents)
         edtSearch = findViewById(R.id.edtSearch)
+        groupStatus = findViewById(R.id.groupStatus)
+        groupCategory = findViewById(R.id.groupCategory)
         txtNoResults = findViewById(R.id.txtNoResults)
 
         // a Toolbar do layout passa a ser a barra da tela, com o menu
@@ -61,6 +67,23 @@ class EventsActivity : AppCompatActivity() {
         edtSearch.setOnEditorActionListener { _, actionId, _ ->
             if (actionId == EditorInfo.IME_ACTION_SEARCH) hideKeyboard()
             false
+        }
+
+        createCategoryChips()
+        groupStatus.setOnCheckedStateChangeListener { _, _ -> applyFilters() }
+        groupCategory.setOnCheckedStateChangeListener { _, _ -> applyFilters() }
+    }
+
+    // uma opção "Todas" e uma para cada categoria; a tag guarda o nome usado no filtro
+    private fun createCategoryChips() {
+        val names = listOf("") + resources.getStringArray(R.array.categories)
+        for (name in names) {
+            val chip = layoutInflater.inflate(R.layout.item_filter_chip, groupCategory, false) as Chip
+            chip.id = View.generateViewId()
+            chip.tag = name
+            chip.text = name.ifEmpty { getString(R.string.filter_all_categories) }
+            groupCategory.addView(chip)
+            if (name.isEmpty()) chip.isChecked = true
         }
     }
 
@@ -116,16 +139,34 @@ class EventsActivity : AppCompatActivity() {
             .addOnFailureListener { error -> showError(error) }
     }
 
+    // os três filtros valem juntos: título, situação e categoria
     private fun applyFilters() {
-        val query = normalize(edtSearch.text.toString().trim())
-        val events = allEvents.filter { normalize(it.title).contains(query) }
+        val typed = edtSearch.text.toString().trim()
+        val query = normalize(typed)
+        val status = groupStatus.checkedChipId
+        val category = findViewById<Chip>(groupCategory.checkedChipId)?.tag as String? ?: ""
+
+        val events = allEvents.filter { event ->
+            val matchesTitle = normalize(event.title).contains(query)
+            val matchesStatus = when (status) {
+                R.id.chipUpcoming -> !event.hasEnded()
+                R.id.chipEnded -> event.hasEnded()
+                else -> true
+            }
+            val matchesCategory = category.isEmpty() || event.category == category
+            matchesTitle && matchesStatus && matchesCategory
+        }
 
         rvEvents.adapter = EventAdapter(events) { event -> openDetails(event) }
 
         // a mensagem só faz sentido depois que os eventos carregaram
         val noResults = events.isEmpty() && allEvents.isNotEmpty()
         txtNoResults.visibility = if (noResults) View.VISIBLE else View.GONE
-        txtNoResults.text = getString(R.string.no_results, edtSearch.text.toString().trim())
+        txtNoResults.text = if (typed.isNotEmpty()) {
+            getString(R.string.no_results, typed)
+        } else {
+            getString(R.string.no_results_filters)
+        }
     }
 
     // "Palestra Inteligência" e "palestra inteligencia" ficam iguais:

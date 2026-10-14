@@ -62,6 +62,22 @@
     <string name="no_ratings">Ainda sem avaliações</string>
     <string name="search_events">Buscar evento pelo título</string>
     <string name="no_results">Nenhum evento encontrado para \"%1$s\"</string>
+    <string name="no_results_filters">Nenhum evento com esses filtros</string>
+    <string name="filter_upcoming">Próximos</string>
+    <string name="filter_ended">Encerrados</string>
+    <string name="filter_all">Todos</string>
+    <string name="filter_all_categories">Todas as categorias</string>
+
+    <!-- mesmos nomes gravados no campo category dos eventos -->
+    <string-array name="categories">
+        <item>Palestra</item>
+        <item>Workshop</item>
+        <item>Seminário</item>
+        <item>Competição</item>
+        <item>Feira</item>
+        <item>Visita técnica</item>
+        <item>Semana acadêmica</item>
+    </string-array>
     <string name="no_favorites">Nenhum favorito ainda</string>
     <string name="no_favorites_hint">Toque no coração nos detalhes de um evento para guardá-lo aqui.</string>
     <string name="enroll">Inscrever-se</string>
