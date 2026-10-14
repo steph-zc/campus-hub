@@ -104,6 +104,15 @@
                         style="@style/Widget.CampusHub.InfoRow"
                         app:drawableStartCompat="@drawable/ic_people" />
 
+                    <!-- média das notas; só aparece em eventos encerrados -->
+                    <TextView
+                        android:id="@+id/txtRatingAverage"
+                        style="@style/Widget.CampusHub.InfoRow"
+                        android:textStyle="bold"
+                        android:visibility="gone"
+                        app:drawableStartCompat="@drawable/ic_star"
+                        app:drawableTint="@color/ui_accent" />
+
                 </LinearLayout>
 
             </com.google.android.material.card.MaterialCardView>

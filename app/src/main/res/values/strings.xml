@@ -59,6 +59,7 @@
     <string name="rating_hint">Toque nas estrelas para dar uma nota de 1 a 5</string>
     <string name="your_rating_value">Sua nota: %1$d de 5. Toque para alterar.</string>
     <string name="rating_saved">Avaliação salva</string>
+    <string name="no_ratings">Ainda sem avaliações</string>
     <string name="no_favorites">Nenhum favorito ainda</string>
     <string name="no_favorites_hint">Toque no coração nos detalhes de um evento para guardá-lo aqui.</string>
     <string name="enroll">Inscrever-se</string>

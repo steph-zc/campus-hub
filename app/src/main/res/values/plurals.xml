@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- "4,5 (1 avaliação)" ou "4,5 (2 avaliações)" -->
+    <plurals name="rating_average">
+        <item quantity="one">%1$s (%2$d avaliação)</item>
+        <item quantity="other">%1$s (%2$d avaliações)</item>
+    </plurals>
+</resources>

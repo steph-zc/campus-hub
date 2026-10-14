@@ -25,6 +25,8 @@ import com.google.android.material.chip.Chip
 import com.google.android.material.textfield.TextInputEditText
 import com.google.android.material.textfield.TextInputLayout
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.AggregateField
+import com.google.firebase.firestore.AggregateSource
 import com.google.firebase.firestore.CollectionReference
 import com.google.firebase.firestore.DocumentReference
 import com.google.firebase.firestore.DocumentSnapshot
@@ -32,6 +34,7 @@ import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.firestore.Query
+import java.util.Locale
 
 class EventDetailsActivity : AppCompatActivity() {
 
@@ -51,6 +54,7 @@ class EventDetailsActivity : AppCompatActivity() {
     private lateinit var txtTime: TextView
     private lateinit var txtLocation: TextView
     private lateinit var txtCapacity: TextView
+    private lateinit var txtRatingAverage: TextView
     private lateinit var txtEnrolled: TextView
     private lateinit var btnEnroll: MaterialButton
     private lateinit var btnCancelEnrollment: MaterialButton
@@ -96,6 +100,7 @@ class EventDetailsActivity : AppCompatActivity() {
         txtTime = findViewById(R.id.txtTime)
         txtLocation = findViewById(R.id.txtLocation)
         txtCapacity = findViewById(R.id.txtCapacity)
+        txtRatingAverage = findViewById(R.id.txtRatingAverage)
         txtEnrolled = findViewById(R.id.txtEnrolled)
         btnEnroll = findViewById(R.id.btnEnroll)
         btnCancelEnrollment = findViewById(R.id.btnCancelEnrollment)
@@ -234,6 +239,7 @@ class EventDetailsActivity : AppCompatActivity() {
                 invalidateOptionsMenu()
                 showEvent(event, userCourse, isEnrolled)
                 showRatingState(event, isEnrolled, myRating)
+                if (event.hasEnded()) loadRatingAverage()
             }
             .addOnFailureListener { error ->
                 Toast.makeText(this, error.message, Toast.LENGTH_LONG).show()
@@ -269,6 +275,25 @@ class EventDetailsActivity : AppCompatActivity() {
         showRatingHint(myRating)
     }
 
+    // o próprio Firestore calcula a média e a quantidade, sem baixar as avaliações uma a uma
+    private fun loadRatingAverage() {
+        val average = AggregateField.average("value")
+        val count = AggregateField.count()
+
+        eventRef.collection("ratings").aggregate(average, count).get(AggregateSource.SERVER)
+            .addOnSuccessListener { result ->
+                val total = result.get(count)
+                txtRatingAverage.text = if (total == 0L) {
+                    getString(R.string.no_ratings)
+                } else {
+                    // uma casa decimal com vírgula: 4,5
+                    val value = String.format(Locale.forLanguageTag("pt-BR"), "%.1f", result.get(average))
+                    resources.getQuantityString(R.plurals.rating_average, total.toInt(), value, total.toInt())
+                }
+                txtRatingAverage.visibility = View.VISIBLE
+            }
+    }
+
     private fun showRatingHint(rating: Int) {
         txtRatingHint.text = if (rating == 0) {
             getString(R.string.rating_hint)
@@ -293,6 +318,8 @@ class EventDetailsActivity : AppCompatActivity() {
             .addOnSuccessListener {
                 showRatingHint(value)
                 Toast.makeText(this, R.string.rating_saved, Toast.LENGTH_SHORT).show()
+                // a nota nova muda a média
+                loadRatingAverage()
             }
             .addOnFailureListener { error ->
                 Toast.makeText(this, error.message, Toast.LENGTH_LONG).show()
