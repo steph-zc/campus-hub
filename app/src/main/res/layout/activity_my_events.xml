@@ -30,7 +30,7 @@
         android:clipToPadding="false"
         app:layout_behavior="@string/appbar_scrolling_view_behavior" />
 
-    <!-- mostrado quando o aluno ainda não tem inscrições -->
+    <!-- mostrado quando a lista está vazia; nos favoritos o código troca ícone e textos -->
     <LinearLayout
         android:id="@+id/layoutEmpty"
         android:layout_width="match_parent"
@@ -42,6 +42,7 @@
         android:visibility="gone">
 
         <ImageView
+            android:id="@+id/imgEmpty"
             android:layout_width="72dp"
             android:layout_height="72dp"
             android:importantForAccessibility="no"
@@ -49,6 +50,7 @@
             app:tint="?android:attr/textColorSecondary" />
 
         <TextView
+            android:id="@+id/txtEmptyTitle"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
@@ -59,6 +61,7 @@
             android:textStyle="bold" />
 
         <TextView
+            android:id="@+id/txtEmptyHint"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"

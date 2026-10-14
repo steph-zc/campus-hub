@@ -9,6 +9,53 @@ import java.util.Calendar
 object SampleEvents {
 
     private val events = listOf(
+        // eventos que já aconteceram, para testar avaliações e o filtro de encerrados
+        Event(
+            title = "Palestra: Carreira em Tecnologia",
+            description = "Profissionais da região contam como entraram no mercado de " +
+                "tecnologia e o que as empresas procuram nos recém-formados.",
+            location = "Auditório Central",
+            date = date(2026, Calendar.SEPTEMBER, 16, 19, 0),
+            capacity = 80,
+            course = "Ciência da Computação",
+            openToAll = true,
+            category = "Palestra"
+        ),
+        Event(
+            title = "Workshop de Oratória Jurídica",
+            description = "Técnicas de argumentação e postura para sustentações orais. " +
+                "Exclusivo para alunos de Direito.",
+            location = "Sala 101, Prédio 2",
+            date = date(2026, Calendar.SEPTEMBER, 24, 14, 0),
+            capacity = 35,
+            course = "Direito",
+            openToAll = false,
+            category = "Workshop"
+        ),
+        Event(
+            title = "Dia de Campo: Manejo do Solo",
+            description = "Demonstração prática de análise e correção do solo na área " +
+                "experimental, com almoço no local.",
+            location = "Área Experimental da Agronomia",
+            date = date(2026, Calendar.OCTOBER, 2, 8, 0),
+            capacity = 50,
+            course = "Agronomia",
+            openToAll = true,
+            category = "Visita técnica"
+        ),
+        Event(
+            title = "Seminário de Gestão e Empreendedorismo",
+            description = "Ex-alunos que abriram o próprio negócio falam sobre planejamento, " +
+                "finanças e os primeiros anos da empresa.",
+            location = "Auditório Central",
+            date = date(2026, Calendar.OCTOBER, 8, 19, 0),
+            capacity = 150,
+            course = "Administração",
+            openToAll = true,
+            category = "Seminário"
+        ),
+
+        // próximos eventos
         Event(
             title = "Semana Acadêmica de Ciência da Computação",
             description = "Palestras, minicursos e maratona de programação. Exclusiva para " +
@@ -17,7 +64,8 @@ object SampleEvents {
             date = date(2026, Calendar.OCTOBER, 20, 19, 0),
             capacity = 120,
             course = "Ciência da Computação",
-            openToAll = false
+            openToAll = false,
+            category = "Semana acadêmica"
         ),
         Event(
             title = "Palestra: Inteligência Artificial no Agronegócio",
@@ -27,7 +75,8 @@ object SampleEvents {
             date = date(2026, Calendar.OCTOBER, 22, 14, 0),
             capacity = 60,
             course = "Agronomia",
-            openToAll = true
+            openToAll = true,
+            category = "Palestra"
         ),
         Event(
             title = "Workshop de Primeiros Socorros",
@@ -37,7 +86,8 @@ object SampleEvents {
             date = date(2026, Calendar.OCTOBER, 27, 9, 0),
             capacity = 30,
             course = "Medicina",
-            openToAll = false
+            openToAll = false,
+            category = "Workshop"
         ),
         Event(
             title = "Júri Simulado",
@@ -46,7 +96,8 @@ object SampleEvents {
             date = date(2026, Calendar.OCTOBER, 29, 19, 30),
             capacity = 80,
             course = "Direito",
-            openToAll = true
+            openToAll = true,
+            category = "Workshop"
         ),
         Event(
             title = "Feira de Profissões",
@@ -56,7 +107,8 @@ object SampleEvents {
             date = date(2026, Calendar.NOVEMBER, 5, 8, 30),
             capacity = 300,
             course = "Administração",
-            openToAll = true
+            openToAll = true,
+            category = "Feira"
         ),
         Event(
             title = "Visita Técnica a Obra",
@@ -66,7 +118,8 @@ object SampleEvents {
             date = date(2026, Calendar.NOVEMBER, 11, 13, 30),
             capacity = 25,
             course = "Engenharia Civil",
-            openToAll = false
+            openToAll = false,
+            category = "Visita técnica"
         ),
         Event(
             title = "Hackathon CampusHub",
@@ -76,7 +129,8 @@ object SampleEvents {
             date = date(2026, Calendar.NOVEMBER, 13, 8, 0),
             capacity = 40,
             course = "Ciência da Computação",
-            openToAll = false
+            openToAll = false,
+            category = "Competição"
         ),
         Event(
             title = "Seminário de Arquitetura Sustentável",
@@ -86,7 +140,8 @@ object SampleEvents {
             date = date(2026, Calendar.NOVEMBER, 18, 19, 0),
             capacity = 100,
             course = "Arquitetura",
-            openToAll = true
+            openToAll = true,
+            category = "Seminário"
         )
     )
 

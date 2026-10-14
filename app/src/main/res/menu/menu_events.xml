@@ -2,11 +2,17 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
-    <!-- os dois primeiros aparecem como ícones na barra -->
+    <!-- os três primeiros aparecem como ícones na barra -->
     <item
         android:id="@+id/menuMyEvents"
         android:icon="@drawable/ic_event_available"
         android:title="@string/my_events"
+        app:showAsAction="ifRoom" />
+
+    <item
+        android:id="@+id/menuFavorites"
+        android:icon="@drawable/ic_favorite_border"
+        android:title="@string/my_favorites"
         app:showAsAction="ifRoom" />
 
     <item

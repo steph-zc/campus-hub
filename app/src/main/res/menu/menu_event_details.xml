@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <!-- ícone e texto trocam conforme o evento está nos favoritos ou não -->
+    <item
+        android:id="@+id/menuFavorite"
+        android:icon="@drawable/ic_favorite_border"
+        android:title="@string/add_favorite"
+        android:visible="false"
+        app:showAsAction="always" />
+
+</menu>

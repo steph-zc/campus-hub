@@ -34,6 +34,52 @@
     <string name="remaining_spots">%1$d vagas restantes</string>
     <string name="spots_of_capacity">%1$d de %2$d vagas disponíveis</string>
     <string name="sold_out">Vagas esgotadas</string>
+    <string name="event_ended">Evento encerrado</string>
+    <string name="add_favorite">Favoritar</string>
+    <string name="remove_favorite">Remover dos favoritos</string>
+    <string name="favorite_added">Adicionado aos favoritos</string>
+    <string name="favorite_removed">Removido dos favoritos</string>
+    <string name="my_favorites">Meus favoritos</string>
+    <string name="comments">Comentários</string>
+    <string name="comments_count">Comentários (%1$d)</string>
+    <string name="write_comment">Escreva um comentário</string>
+    <string name="send_comment">Enviar comentário</string>
+    <string name="no_comments">Nenhum comentário ainda. Seja o primeiro!</string>
+    <string name="empty_comment">Escreva algo antes de enviar</string>
+    <string name="comment_options">Opções do comentário</string>
+    <string name="comment_edited">%1$s · editado</string>
+    <string name="edit">Editar</string>
+    <string name="delete">Excluir</string>
+    <string name="edit_comment">Editar comentário</string>
+    <string name="comment_updated">Comentário atualizado</string>
+    <string name="delete_comment_question">Excluir este comentário? Essa ação não pode ser desfeita.</string>
+    <string name="comment_deleted">Comentário excluído</string>
+    <string name="attended_banner">Você se inscreveu neste evento</string>
+    <string name="your_rating">Sua avaliação</string>
+    <string name="rating_hint">Toque nas estrelas para dar uma nota de 1 a 5</string>
+    <string name="your_rating_value">Sua nota: %1$d de 5. Toque para alterar.</string>
+    <string name="rating_saved">Avaliação salva</string>
+    <string name="no_ratings">Ainda sem avaliações</string>
+    <string name="search_events">Buscar evento pelo título</string>
+    <string name="no_results">Nenhum evento encontrado para \"%1$s\"</string>
+    <string name="no_results_filters">Nenhum evento com esses filtros</string>
+    <string name="filter_upcoming">Próximos</string>
+    <string name="filter_ended">Encerrados</string>
+    <string name="filter_all">Todos</string>
+    <string name="filter_all_categories">Todas as categorias</string>
+
+    <!-- mesmos nomes gravados no campo category dos eventos -->
+    <string-array name="categories">
+        <item>Palestra</item>
+        <item>Workshop</item>
+        <item>Seminário</item>
+        <item>Competição</item>
+        <item>Feira</item>
+        <item>Visita técnica</item>
+        <item>Semana acadêmica</item>
+    </string-array>
+    <string name="no_favorites">Nenhum favorito ainda</string>
+    <string name="no_favorites_hint">Toque no coração nos detalhes de um evento para guardá-lo aqui.</string>
     <string name="enroll">Inscrever-se</string>
     <string name="cancel_enrollment">Cancelar inscrição</string>
     <string name="enrolled_banner">Você está inscrito neste evento</string>

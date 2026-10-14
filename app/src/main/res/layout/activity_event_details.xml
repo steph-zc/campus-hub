@@ -70,10 +70,15 @@
                     </com.google.android.material.chip.ChipGroup>
 
                     <TextView
+                        android:id="@+id/txtCategory"
+                        style="@style/Widget.CampusHub.CategoryLabel"
+                        android:layout_marginTop="16dp" />
+
+                    <TextView
                         android:id="@+id/txtTitle"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="12dp"
+                        android:layout_marginTop="4dp"
                         android:layout_marginBottom="8dp"
                         android:textColor="?android:attr/textColorPrimary"
                         android:textSize="24sp"
@@ -98,6 +103,15 @@
                         android:id="@+id/txtCapacity"
                         style="@style/Widget.CampusHub.InfoRow"
                         app:drawableStartCompat="@drawable/ic_people" />
+
+                    <!-- média das notas; só aparece em eventos encerrados -->
+                    <TextView
+                        android:id="@+id/txtRatingAverage"
+                        style="@style/Widget.CampusHub.InfoRow"
+                        android:textStyle="bold"
+                        android:visibility="gone"
+                        app:drawableStartCompat="@drawable/ic_star"
+                        app:drawableTint="@color/ui_accent" />
 
                 </LinearLayout>
 
@@ -139,6 +153,54 @@
                 android:visibility="gone"
                 app:cornerRadius="12dp" />
 
+            <!-- só aparece para quem estava inscrito, depois que o evento termina -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/cardRating"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:visibility="gone"
+                app:cardCornerRadius="12dp"
+                app:cardElevation="2dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_horizontal"
+                    android:orientation="vertical"
+                    android:padding="20dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/your_rating"
+                        android:textColor="?android:attr/textColorPrimary"
+                        android:textSize="18sp"
+                        android:textStyle="bold" />
+
+                    <!-- stepSize 1 = só notas inteiras, de 1 a 5 -->
+                    <RatingBar
+                        android:id="@+id/ratingBar"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:numStars="5"
+                        android:progressBackgroundTint="?android:attr/textColorSecondary"
+                        android:progressTint="@color/ui_accent"
+                        android:stepSize="1" />
+
+                    <TextView
+                        android:id="@+id/txtRatingHint"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:gravity="center"
+                        android:text="@string/rating_hint" />
+
+                </LinearLayout>
+
+            </com.google.android.material.card.MaterialCardView>
+
             <!-- descrição completa -->
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
@@ -168,6 +230,76 @@
                         android:layout_marginTop="8dp"
                         android:lineSpacingExtra="4dp"
                         android:textSize="16sp" />
+
+                </LinearLayout>
+
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- comentários: campo para escrever e lista, do mais novo para o mais antigo -->
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                app:cardCornerRadius="12dp"
+                app:cardElevation="2dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="20dp">
+
+                    <TextView
+                        android:id="@+id/txtCommentsTitle"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/comments"
+                        android:textColor="?android:attr/textColorPrimary"
+                        android:textSize="18sp"
+                        android:textStyle="bold" />
+
+                    <!-- o ícone de enviar fica dentro do próprio campo -->
+                    <com.google.android.material.textfield.TextInputLayout
+                        android:id="@+id/layoutComment"
+                        style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:hint="@string/write_comment"
+                        app:counterEnabled="true"
+                        app:counterMaxLength="500"
+                        app:endIconContentDescription="@string/send_comment"
+                        app:endIconDrawable="@drawable/ic_send"
+                        app:endIconMode="custom"
+                        app:endIconTint="?attr/colorPrimary">
+
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/edtComment"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:inputType="textCapSentences|textMultiLine"
+                            android:maxLength="500"
+                            android:maxLines="5" />
+
+                    </com.google.android.material.textfield.TextInputLayout>
+
+                    <TextView
+                        android:id="@+id/txtNoComments"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:gravity="center"
+                        android:paddingVertical="12dp"
+                        android:text="@string/no_comments"
+                        android:visibility="gone" />
+
+                    <!-- dentro da rolagem da tela, a lista mostra todos os itens de uma vez -->
+                    <androidx.recyclerview.widget.RecyclerView
+                        android:id="@+id/rvComments"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:nestedScrollingEnabled="false" />
 
                 </LinearLayout>
 

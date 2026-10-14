@@ -24,4 +24,30 @@
         <item name="android:textSize">16sp</item>
         <item name="drawableTint">?attr/colorPrimary</item>
     </style>
+
+    <!-- tipo do evento em letras maiúsculas, acima do título -->
+    <style name="Widget.CampusHub.CategoryLabel" parent="android:Widget.TextView">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:letterSpacing">0.08</item>
+        <item name="android:textAllCaps">true</item>
+        <item name="android:textColor">?attr/colorPrimary</item>
+        <item name="android:textSize">12sp</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+
+    <!-- opção de filtro na barra azul; Choice = só uma marcada por grupo -->
+    <style name="Widget.CampusHub.FilterChip" parent="Widget.MaterialComponents.Chip.Choice">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:textColor">@color/chip_filter_text</item>
+        <item name="android:textSize">13sp</item>
+        <item name="chipBackgroundColor">@color/chip_filter_bg</item>
+        <!-- o Chip pinta uma camada branca por baixo do fundo; transparente para não esconder o texto -->
+        <item name="chipSurfaceColor">@android:color/transparent</item>
+        <item name="chipStrokeColor">@color/chip_filter_stroke</item>
+        <item name="chipStrokeWidth">1dp</item>
+        <item name="chipMinHeight">32dp</item>
+        <item name="ensureMinTouchTargetSize">false</item>
+    </style>
 </resources>

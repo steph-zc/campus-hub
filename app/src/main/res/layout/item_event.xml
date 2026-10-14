@@ -45,6 +45,7 @@
 
             <!-- bloco com o dia e o mês do evento -->
             <LinearLayout
+                android:id="@+id/dateBadge"
                 android:layout_width="64dp"
                 android:layout_height="wrap_content"
                 android:background="@drawable/bg_date_badge"
@@ -76,6 +77,11 @@
                 android:layout_marginStart="16dp"
                 android:layout_weight="1"
                 android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/txtCategory"
+                    style="@style/Widget.CampusHub.CategoryLabel"
+                    android:layout_marginBottom="2dp" />
 
                 <TextView
                     android:id="@+id/txtTitle"

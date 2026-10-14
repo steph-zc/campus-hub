@@ -108,16 +108,7 @@ class ProfileActivity : AppCompatActivity() {
 
     private fun showHeader(name: String) {
         txtName.text = name
-        txtInitials.text = initials(name)
-    }
-
-    // "Stefan Zanella" vira "SZ"; um nome só vira uma letra
-    private fun initials(name: String): String {
-        val words = name.trim().split(" ").filter { it.isNotEmpty() }
-        if (words.isEmpty()) return ""
-        val first = words.first().first()
-        val last = if (words.size > 1) words.last().first().toString() else ""
-        return (first + last).uppercase()
+        txtInitials.text = Avatar.initials(name)
     }
 
     private fun saveProfile() {
