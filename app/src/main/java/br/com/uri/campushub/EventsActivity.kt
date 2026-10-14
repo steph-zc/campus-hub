@@ -5,18 +5,23 @@ import android.os.Bundle
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
+import android.view.inputmethod.EditorInfo
+import android.view.inputmethod.InputMethodManager
 import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.core.widget.doAfterTextChanged
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.appbar.AppBarLayout
 import com.google.android.material.appbar.MaterialToolbar
+import com.google.android.material.textfield.TextInputEditText
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import java.text.Normalizer
 
 class EventsActivity : AppCompatActivity() {
 
@@ -25,9 +30,14 @@ class EventsActivity : AppCompatActivity() {
     private lateinit var txtHello: TextView
     private lateinit var progressBar: ProgressBar
     private lateinit var rvEvents: RecyclerView
+    private lateinit var edtSearch: TextInputEditText
+    private lateinit var txtNoResults: TextView
 
     private val auth = FirebaseAuth.getInstance()
     private val db = FirebaseFirestore.getInstance()
+
+    // todos os eventos do Firestore; a lista mostrada é esta depois de filtrada
+    private var allEvents = listOf<Event>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -38,11 +48,20 @@ class EventsActivity : AppCompatActivity() {
         txtHello = findViewById(R.id.txtHello)
         progressBar = findViewById(R.id.progressBar)
         rvEvents = findViewById(R.id.rvEvents)
+        edtSearch = findViewById(R.id.edtSearch)
+        txtNoResults = findViewById(R.id.txtNoResults)
 
         // a Toolbar do layout passa a ser a barra da tela, com o menu
         setSupportActionBar(toolbar)
         rvEvents.layoutManager = LinearLayoutManager(this)
         applySystemBarsPadding()
+
+        // filtra a cada letra digitada, sem precisar consultar o Firestore de novo
+        edtSearch.doAfterTextChanged { applyFilters() }
+        edtSearch.setOnEditorActionListener { _, actionId, _ ->
+            if (actionId == EditorInfo.IME_ACTION_SEARCH) hideKeyboard()
+            false
+        }
     }
 
     // recarrega ao voltar de outra tela: as vagas mudam com as inscrições
@@ -89,11 +108,38 @@ class EventsActivity : AppCompatActivity() {
                 // próximos primeiro, do mais perto para o mais longe;
                 // depois os encerrados, do mais recente para o mais antigo
                 val (ended, upcoming) = result.toObjects(Event::class.java).partition { it.hasEnded() }
-                val events = upcoming + ended.reversed()
-                rvEvents.adapter = EventAdapter(events) { event -> openDetails(event) }
+                allEvents = upcoming + ended.reversed()
                 progressBar.visibility = View.GONE
+                // reaplica a busca, caso o aluno tenha voltado de outra tela com texto digitado
+                applyFilters()
             }
             .addOnFailureListener { error -> showError(error) }
+    }
+
+    private fun applyFilters() {
+        val query = normalize(edtSearch.text.toString().trim())
+        val events = allEvents.filter { normalize(it.title).contains(query) }
+
+        rvEvents.adapter = EventAdapter(events) { event -> openDetails(event) }
+
+        // a mensagem só faz sentido depois que os eventos carregaram
+        val noResults = events.isEmpty() && allEvents.isNotEmpty()
+        txtNoResults.visibility = if (noResults) View.VISIBLE else View.GONE
+        txtNoResults.text = getString(R.string.no_results, edtSearch.text.toString().trim())
+    }
+
+    // "Palestra Inteligência" e "palestra inteligencia" ficam iguais:
+    // tira os acentos e deixa tudo minúsculo antes de comparar
+    private fun normalize(text: String): String {
+        val withoutAccents = Normalizer.normalize(text, Normalizer.Form.NFD)
+            .replace(Regex("\\p{Mn}+"), "")
+        return withoutAccents.lowercase()
+    }
+
+    private fun hideKeyboard() {
+        val keyboard = getSystemService(InputMethodManager::class.java)
+        keyboard.hideSoftInputFromWindow(edtSearch.windowToken, 0)
+        edtSearch.clearFocus()
     }
 
     private fun openDetails(event: Event) {

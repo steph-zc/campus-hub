@@ -17,4 +17,7 @@
 
     <!-- menu ⋮ da Toolbar; sem isso ele herda o texto branco da barra -->
     <style name="ThemeOverlay.CampusHub.Popup" parent="ThemeOverlay.MaterialComponents.Light" />
+
+    <!-- campo de busca dentro da barra; usa as mesmas cores do menu (claro de dia, escuro à noite) -->
+    <style name="ThemeOverlay.CampusHub.Search" parent="ThemeOverlay.CampusHub.Popup" />
 </resources>
