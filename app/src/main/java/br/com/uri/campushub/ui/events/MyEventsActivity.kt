@@ -1,4 +1,4 @@
-package br.com.uri.campushub
+package br.com.uri.campushub.ui.events
 
 import android.content.Intent
 import android.os.Bundle
@@ -14,6 +14,9 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import br.com.uri.campushub.R
+import br.com.uri.campushub.data.model.Event
+import br.com.uri.campushub.ui.details.EventDetailsActivity
 import com.google.android.gms.tasks.Tasks
 import com.google.android.material.appbar.AppBarLayout
 import com.google.android.material.appbar.MaterialToolbar

@@ -1,4 +1,4 @@
-package br.com.uri.campushub
+package br.com.uri.campushub.ui.common
 
 // iniciais mostradas nos círculos do perfil e dos comentários
 object Avatar {

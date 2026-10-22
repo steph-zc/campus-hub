@@ -1,7 +1,9 @@
-package br.com.uri.campushub
+package br.com.uri.campushub.ui.events
 
 import android.view.View
 import androidx.core.content.ContextCompat
+import br.com.uri.campushub.R
+import br.com.uri.campushub.data.model.Event
 import com.google.android.material.chip.Chip
 
 // preenche as etiquetas de curso e de acesso; usado na lista e nos detalhes

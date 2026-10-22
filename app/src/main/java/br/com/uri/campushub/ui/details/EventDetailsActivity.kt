@@ -1,4 +1,4 @@
-package br.com.uri.campushub
+package br.com.uri.campushub.ui.details
 
 import android.os.Bundle
 import android.view.Menu
@@ -16,6 +16,10 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.widget.NestedScrollView
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import br.com.uri.campushub.R
+import br.com.uri.campushub.data.model.Comment
+import br.com.uri.campushub.data.model.Event
+import br.com.uri.campushub.ui.events.EventChips
 import com.google.android.gms.tasks.Tasks
 import com.google.android.material.appbar.AppBarLayout
 import com.google.android.material.appbar.MaterialToolbar

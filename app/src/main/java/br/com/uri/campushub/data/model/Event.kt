@@ -1,4 +1,4 @@
-package br.com.uri.campushub
+package br.com.uri.campushub.data.model
 
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.DocumentId

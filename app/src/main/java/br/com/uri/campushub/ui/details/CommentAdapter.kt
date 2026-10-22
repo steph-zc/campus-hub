@@ -1,4 +1,4 @@
-package br.com.uri.campushub
+package br.com.uri.campushub.ui.details
 
 import android.view.LayoutInflater
 import android.view.View
@@ -7,6 +7,9 @@ import android.widget.ImageButton
 import android.widget.PopupMenu
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
+import br.com.uri.campushub.R
+import br.com.uri.campushub.data.model.Comment
+import br.com.uri.campushub.ui.common.Avatar
 
 // a tela decide o que fazer ao editar ou excluir; o adapter só avisa qual comentário foi escolhido
 class CommentAdapter(

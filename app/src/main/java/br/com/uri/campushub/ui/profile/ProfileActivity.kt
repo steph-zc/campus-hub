@@ -1,4 +1,4 @@
-package br.com.uri.campushub
+package br.com.uri.campushub.ui.profile
 
 import android.content.Intent
 import android.os.Bundle
@@ -12,6 +12,9 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.widget.NestedScrollView
+import br.com.uri.campushub.R
+import br.com.uri.campushub.ui.auth.MainActivity
+import br.com.uri.campushub.ui.common.Avatar
 import com.google.android.material.appbar.AppBarLayout
 import com.google.android.material.appbar.MaterialToolbar
 import com.google.android.material.button.MaterialButton

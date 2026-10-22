@@ -1,4 +1,4 @@
-package br.com.uri.campushub
+package br.com.uri.campushub.ui.events
 
 import android.content.Intent
 import android.os.Bundle
@@ -16,6 +16,12 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.widget.doAfterTextChanged
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import br.com.uri.campushub.R
+import br.com.uri.campushub.data.SampleEvents
+import br.com.uri.campushub.data.model.Event
+import br.com.uri.campushub.ui.auth.MainActivity
+import br.com.uri.campushub.ui.details.EventDetailsActivity
+import br.com.uri.campushub.ui.profile.ProfileActivity
 import com.google.android.material.appbar.AppBarLayout
 import com.google.android.material.appbar.MaterialToolbar
 import com.google.android.material.chip.Chip
