@@ -13,14 +13,14 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.widget.NestedScrollView
 import br.com.uri.campushub.R
+import br.com.uri.campushub.data.repository.AuthRepository
+import br.com.uri.campushub.data.repository.UserRepository
 import br.com.uri.campushub.ui.auth.MainActivity
 import br.com.uri.campushub.ui.common.Avatar
 import com.google.android.material.appbar.AppBarLayout
 import com.google.android.material.appbar.MaterialToolbar
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.textfield.TextInputEditText
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.firestore.FirebaseFirestore
 
 class ProfileActivity : AppCompatActivity() {
 
@@ -36,8 +36,8 @@ class ProfileActivity : AppCompatActivity() {
     private lateinit var btnSave: MaterialButton
     private lateinit var btnLogout: MaterialButton
 
-    private val auth = FirebaseAuth.getInstance()
-    private val db = FirebaseFirestore.getInstance()
+    private val authRepository = AuthRepository()
+    private val userRepository = UserRepository()
 
     // mesma lista do cadastro, sem o "Selecione o curso" da posição 0
     private lateinit var courses: List<String>
@@ -87,18 +87,15 @@ class ProfileActivity : AppCompatActivity() {
     }
 
     private fun loadProfile() {
-        val user = auth.currentUser!!
-
-        db.collection("users").document(user.uid).get()
-            .addOnSuccessListener { document ->
-                val name = document.getString("name") ?: ""
-                val course = document.getString("course") ?: ""
+        userRepository.get(authRepository.requireUserId())
+            .addOnSuccessListener { user ->
+                val name = user?.name ?: ""
 
                 showHeader(name)
-                txtEmail.text = user.email
+                txtEmail.text = authRepository.currentUserEmail()
                 edtName.setText(name)
                 // false para não abrir a lista nem filtrar as opções ao preencher
-                dropCourse.setText(course, false)
+                dropCourse.setText(user?.course ?: "", false)
 
                 progressBar.visibility = View.GONE
                 scrollContent.visibility = View.VISIBLE
@@ -128,11 +125,8 @@ class ProfileActivity : AppCompatActivity() {
         }
 
         btnSave.isEnabled = false
-        val uid = auth.currentUser!!.uid
-        val changes = mapOf("name" to name, "course" to course)
 
-        // update altera só esses campos e mantém o email salvo no documento
-        db.collection("users").document(uid).update(changes)
+        userRepository.update(authRepository.requireUserId(), name, course)
             .addOnSuccessListener {
                 btnSave.isEnabled = true
                 showHeader(name)
@@ -145,7 +139,7 @@ class ProfileActivity : AppCompatActivity() {
     }
 
     private fun logout() {
-        auth.signOut()
+        authRepository.logout()
         val intent = Intent(this, MainActivity::class.java)
         intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
         startActivity(intent)

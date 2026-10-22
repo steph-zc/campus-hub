@@ -19,6 +19,7 @@ import androidx.recyclerview.widget.RecyclerView
 import br.com.uri.campushub.R
 import br.com.uri.campushub.data.model.Comment
 import br.com.uri.campushub.data.model.Event
+import br.com.uri.campushub.data.repository.AuthRepository
 import br.com.uri.campushub.ui.events.EventChips
 import com.google.android.gms.tasks.Tasks
 import com.google.android.material.appbar.AppBarLayout
@@ -28,7 +29,6 @@ import com.google.android.material.card.MaterialCardView
 import com.google.android.material.chip.Chip
 import com.google.android.material.textfield.TextInputEditText
 import com.google.android.material.textfield.TextInputLayout
-import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.AggregateField
 import com.google.firebase.firestore.AggregateSource
 import com.google.firebase.firestore.CollectionReference
@@ -72,7 +72,7 @@ class EventDetailsActivity : AppCompatActivity() {
     private lateinit var txtNoComments: TextView
     private lateinit var rvComments: RecyclerView
 
-    private val auth = FirebaseAuth.getInstance()
+    private val authRepository = AuthRepository()
     private val db = FirebaseFirestore.getInstance()
 
     private lateinit var eventRef: DocumentReference
@@ -126,7 +126,7 @@ class EventDetailsActivity : AppCompatActivity() {
         applySystemBarsPadding()
 
         val eventId = intent.getStringExtra(EXTRA_EVENT_ID)!!
-        val uid = auth.currentUser!!.uid
+        val uid = authRepository.requireUserId()
         eventRef = db.collection("events").document(eventId)
         userRef = db.collection("users").document(uid)
         // a inscrição usa o id do evento, então cada aluno só tem uma por evento
@@ -312,7 +312,7 @@ class EventDetailsActivity : AppCompatActivity() {
         if (stars < 1) ratingBar.rating = 1f
 
         val rating = hashMapOf(
-            "userId" to auth.currentUser!!.uid,
+            "userId" to authRepository.requireUserId(),
             "value" to value,
             "updatedAt" to FieldValue.serverTimestamp()
         )
@@ -426,7 +426,7 @@ class EventDetailsActivity : AppCompatActivity() {
                 val comments = result.toObjects(Comment::class.java)
                 rvComments.adapter = CommentAdapter(
                     comments,
-                    auth.currentUser!!.uid,
+                    authRepository.requireUserId(),
                     onEdit = { comment -> showEditDialog(comment) },
                     onDelete = { comment -> confirmDelete(comment) }
                 )
@@ -449,7 +449,7 @@ class EventDetailsActivity : AppCompatActivity() {
         layoutComment.isEnabled = false
 
         val comment = hashMapOf(
-            "userId" to auth.currentUser!!.uid,
+            "userId" to authRepository.requireUserId(),
             "authorName" to userName,
             "text" to text,
             // a data vem do servidor, não do relógio do celular

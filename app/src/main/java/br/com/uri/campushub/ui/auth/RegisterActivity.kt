@@ -8,9 +8,10 @@ import android.widget.Spinner
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import br.com.uri.campushub.R
+import br.com.uri.campushub.data.model.User
+import br.com.uri.campushub.data.repository.AuthRepository
+import br.com.uri.campushub.data.repository.UserRepository
 import br.com.uri.campushub.ui.events.EventsActivity
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.firestore.FirebaseFirestore
 
 class RegisterActivity : AppCompatActivity() {
 
@@ -22,8 +23,8 @@ class RegisterActivity : AppCompatActivity() {
     private lateinit var btnRegister: Button
     private lateinit var btnBack: Button
 
-    private val auth = FirebaseAuth.getInstance()
-    private val db = FirebaseFirestore.getInstance()
+    private val authRepository = AuthRepository()
+    private val userRepository = UserRepository()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -73,22 +74,13 @@ class RegisterActivity : AppCompatActivity() {
         // evita criar duas contas com toques repetidos
         btnRegister.isEnabled = false
 
-        auth.createUserWithEmailAndPassword(email, password)
-            .addOnSuccessListener { result ->
-                val uid = result.user!!.uid
-                val user = hashMapOf(
-                    "name" to name,
-                    "course" to course,
-                    "email" to email
-                )
-
-                // nome e curso ficam no Firestore, o Auth guarda só email e senha
-                db.collection("users").document(uid).set(user)
-                    .addOnSuccessListener {
-                        Toast.makeText(this, R.string.account_created, Toast.LENGTH_SHORT).show()
-                        openEvents()
-                    }
-                    .addOnFailureListener { error -> showError(error) }
+        // primeiro cria a conta no Auth; com o uid dela, cria o perfil no Firestore
+        // (nome e curso ficam no Firestore, o Auth guarda só email e senha)
+        authRepository.register(email, password)
+            .onSuccessTask { uid -> userRepository.create(uid, User(name, course, email)) }
+            .addOnSuccessListener {
+                Toast.makeText(this, R.string.account_created, Toast.LENGTH_SHORT).show()
+                openEvents()
             }
             .addOnFailureListener { error -> showError(error) }
     }

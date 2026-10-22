@@ -16,11 +16,11 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import br.com.uri.campushub.R
 import br.com.uri.campushub.data.model.Event
+import br.com.uri.campushub.data.repository.AuthRepository
 import br.com.uri.campushub.ui.details.EventDetailsActivity
 import com.google.android.gms.tasks.Tasks
 import com.google.android.material.appbar.AppBarLayout
 import com.google.android.material.appbar.MaterialToolbar
-import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldPath
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.QuerySnapshot
@@ -44,7 +44,7 @@ class MyEventsActivity : AppCompatActivity() {
     private lateinit var btnBrowseEvents: Button
     private lateinit var progressBar: ProgressBar
 
-    private val auth = FirebaseAuth.getInstance()
+    private val authRepository = AuthRepository()
     private val db = FirebaseFirestore.getInstance()
 
     // nome da subcoleção em users/{uid}; sem extra abre as inscrições
@@ -103,7 +103,7 @@ class MyEventsActivity : AppCompatActivity() {
     }
 
     private fun loadMyEvents() {
-        val uid = auth.currentUser!!.uid
+        val uid = authRepository.requireUserId()
 
         // 1º passo: os ids dos eventos inscritos ou favoritados
         db.collection("users").document(uid).collection(list).get()

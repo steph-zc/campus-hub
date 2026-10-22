@@ -5,19 +5,21 @@ import android.os.Bundle
 import android.widget.Button
 import androidx.appcompat.app.AppCompatActivity
 import br.com.uri.campushub.R
+import br.com.uri.campushub.data.repository.AuthRepository
 import br.com.uri.campushub.ui.events.EventsActivity
-import com.google.firebase.auth.FirebaseAuth
 
 class MainActivity : AppCompatActivity() {
 
     private lateinit var btnLogin: Button
     private lateinit var btnRegister: Button
 
+    private val authRepository = AuthRepository()
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         // o Firebase lembra a sessão, então quem já entrou vai direto para os eventos
-        if (FirebaseAuth.getInstance().currentUser != null) {
+        if (authRepository.isLoggedIn()) {
             startActivity(Intent(this, EventsActivity::class.java))
             finish()
             return

@@ -19,6 +19,8 @@ import androidx.recyclerview.widget.RecyclerView
 import br.com.uri.campushub.R
 import br.com.uri.campushub.data.SampleEvents
 import br.com.uri.campushub.data.model.Event
+import br.com.uri.campushub.data.repository.AuthRepository
+import br.com.uri.campushub.data.repository.UserRepository
 import br.com.uri.campushub.ui.auth.MainActivity
 import br.com.uri.campushub.ui.details.EventDetailsActivity
 import br.com.uri.campushub.ui.profile.ProfileActivity
@@ -27,7 +29,6 @@ import com.google.android.material.appbar.MaterialToolbar
 import com.google.android.material.chip.Chip
 import com.google.android.material.chip.ChipGroup
 import com.google.android.material.textfield.TextInputEditText
-import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import java.text.Normalizer
 
@@ -43,7 +44,8 @@ class EventsActivity : AppCompatActivity() {
     private lateinit var groupCategory: ChipGroup
     private lateinit var txtNoResults: TextView
 
-    private val auth = FirebaseAuth.getInstance()
+    private val authRepository = AuthRepository()
+    private val userRepository = UserRepository()
     private val db = FirebaseFirestore.getInstance()
 
     // todos os eventos do Firestore; a lista mostrada é esta depois de filtrada
@@ -114,12 +116,9 @@ class EventsActivity : AppCompatActivity() {
     }
 
     private fun loadUserName() {
-        val uid = auth.currentUser!!.uid
-
-        db.collection("users").document(uid).get()
-            .addOnSuccessListener { document ->
-                val name = document.getString("name")
-                txtHello.text = getString(R.string.hello_user, name)
+        userRepository.get(authRepository.requireUserId())
+            .addOnSuccessListener { user ->
+                txtHello.text = getString(R.string.hello_user, user?.name ?: "")
             }
     }
 
@@ -236,7 +235,7 @@ class EventsActivity : AppCompatActivity() {
     }
 
     private fun logout() {
-        auth.signOut()
+        authRepository.logout()
         val intent = Intent(this, MainActivity::class.java)
         intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
         startActivity(intent)
