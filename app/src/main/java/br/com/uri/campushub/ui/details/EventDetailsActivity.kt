@@ -20,8 +20,11 @@ import br.com.uri.campushub.R
 import br.com.uri.campushub.data.model.Comment
 import br.com.uri.campushub.data.model.Event
 import br.com.uri.campushub.data.repository.AuthRepository
+import br.com.uri.campushub.data.repository.CommentRepository
 import br.com.uri.campushub.data.repository.EnrollmentRepository
 import br.com.uri.campushub.data.repository.EventRepository
+import br.com.uri.campushub.data.repository.FavoriteRepository
+import br.com.uri.campushub.data.repository.RatingRepository
 import br.com.uri.campushub.data.repository.UserRepository
 import br.com.uri.campushub.ui.events.EventChips
 import com.google.android.gms.tasks.Tasks
@@ -32,13 +35,6 @@ import com.google.android.material.card.MaterialCardView
 import com.google.android.material.chip.Chip
 import com.google.android.material.textfield.TextInputEditText
 import com.google.android.material.textfield.TextInputLayout
-import com.google.firebase.firestore.AggregateField
-import com.google.firebase.firestore.AggregateSource
-import com.google.firebase.firestore.CollectionReference
-import com.google.firebase.firestore.DocumentReference
-import com.google.firebase.firestore.FieldValue
-import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.Query
 import java.util.Locale
 
 class EventDetailsActivity : AppCompatActivity() {
@@ -77,16 +73,12 @@ class EventDetailsActivity : AppCompatActivity() {
     private val userRepository = UserRepository()
     private val eventRepository = EventRepository()
     private val enrollmentRepository = EnrollmentRepository()
-    private val db = FirebaseFirestore.getInstance()
+    private val favoriteRepository = FavoriteRepository()
+    private val commentRepository = CommentRepository()
+    private val ratingRepository = RatingRepository()
 
     private lateinit var eventId: String
     private lateinit var uid: String
-
-    private lateinit var eventRef: DocumentReference
-    private lateinit var userRef: DocumentReference
-    private lateinit var favoriteRef: DocumentReference
-    private lateinit var commentsRef: CollectionReference
-    private lateinit var ratingRef: DocumentReference
 
     // null enquanto os dados não chegaram; o coração só aparece depois
     private var isFavorite: Boolean? = null
@@ -133,14 +125,6 @@ class EventDetailsActivity : AppCompatActivity() {
 
         eventId = intent.getStringExtra(EXTRA_EVENT_ID)!!
         uid = authRepository.requireUserId()
-        eventRef = db.collection("events").document(eventId)
-        userRef = db.collection("users").document(uid)
-        // favorito é separado da inscrição: favoritar não reserva vaga
-        favoriteRef = userRef.collection("favorites").document(eventId)
-        // os comentários ficam dentro do evento, visíveis para todos os alunos
-        commentsRef = eventRef.collection("comments")
-        // o id da avaliação é o uid: cada aluno tem no máximo uma por evento
-        ratingRef = eventRef.collection("ratings").document(uid)
 
         btnEnroll.setOnClickListener { enroll() }
         btnCancelEnrollment.setOnClickListener { confirmCancel() }
@@ -195,16 +179,7 @@ class EventDetailsActivity : AppCompatActivity() {
         isFavorite = !wasFavorite
         invalidateOptionsMenu()
 
-        val task = if (wasFavorite) {
-            favoriteRef.delete()
-        } else {
-            favoriteRef.set(hashMapOf(
-                "eventId" to eventRef.id,
-                "favoritedAt" to FieldValue.serverTimestamp()
-            ))
-        }
-
-        task
+        favoriteRepository.setFavorite(uid, eventId, favorite = !wasFavorite)
             .addOnSuccessListener {
                 val message = if (wasFavorite) R.string.favorite_removed else R.string.favorite_added
                 Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
@@ -231,8 +206,8 @@ class EventDetailsActivity : AppCompatActivity() {
         val eventTask = eventRepository.get(eventId)
         val userTask = userRepository.get(uid)
         val enrolledTask = enrollmentRepository.isEnrolled(uid, eventId)
-        val favoriteTask = favoriteRef.get()
-        val ratingTask = ratingRef.get()
+        val favoriteTask = favoriteRepository.isFavorite(uid, eventId)
+        val ratingTask = ratingRepository.getMyRating(uid, eventId)
 
         // espera as cinco buscas terminarem e depois lê o resultado de cada uma
         Tasks.whenAllSuccess<Any>(eventTask, userTask, enrolledTask, favoriteTask, ratingTask)
@@ -247,9 +222,9 @@ class EventDetailsActivity : AppCompatActivity() {
                 val userCourse = user?.course ?: ""
                 userName = user?.name ?: ""
                 val isEnrolled = enrolledTask.result
-                isFavorite = favoriteTask.result.exists()
+                isFavorite = favoriteTask.result
                 // 0 = ainda não avaliou
-                val myRating = ratingTask.result.getLong("value")?.toInt() ?: 0
+                val myRating = ratingTask.result
                 invalidateOptionsMenu()
                 showEvent(event, userCourse, isEnrolled)
                 showRatingState(event, isEnrolled, myRating)
@@ -289,20 +264,16 @@ class EventDetailsActivity : AppCompatActivity() {
         showRatingHint(myRating)
     }
 
-    // o próprio Firestore calcula a média e a quantidade, sem baixar as avaliações uma a uma
     private fun loadRatingAverage() {
-        val average = AggregateField.average("value")
-        val count = AggregateField.count()
-
-        eventRef.collection("ratings").aggregate(average, count).get(AggregateSource.SERVER)
-            .addOnSuccessListener { result ->
-                val total = result.get(count)
-                txtRatingAverage.text = if (total == 0L) {
+        ratingRepository.getSummary(eventId)
+            .addOnSuccessListener { summary ->
+                val total = summary.count.toInt()
+                txtRatingAverage.text = if (total == 0) {
                     getString(R.string.no_ratings)
                 } else {
                     // uma casa decimal com vírgula: 4,5
-                    val value = String.format(Locale.forLanguageTag("pt-BR"), "%.1f", result.get(average))
-                    resources.getQuantityString(R.plurals.rating_average, total.toInt(), value, total.toInt())
+                    val value = String.format(Locale.forLanguageTag("pt-BR"), "%.1f", summary.average)
+                    resources.getQuantityString(R.plurals.rating_average, total, value, total)
                 }
                 txtRatingAverage.visibility = View.VISIBLE
             }
@@ -321,14 +292,7 @@ class EventDetailsActivity : AppCompatActivity() {
         val value = stars.coerceAtLeast(1)
         if (stars < 1) ratingBar.rating = 1f
 
-        val rating = hashMapOf(
-            "userId" to authRepository.requireUserId(),
-            "value" to value,
-            "updatedAt" to FieldValue.serverTimestamp()
-        )
-
-        // set no mesmo documento: a primeira vez cria, as próximas trocam a nota
-        ratingRef.set(rating)
+        ratingRepository.save(uid, eventId, value)
             .addOnSuccessListener {
                 showRatingHint(value)
                 Toast.makeText(this, R.string.rating_saved, Toast.LENGTH_SHORT).show()
@@ -409,12 +373,11 @@ class EventDetailsActivity : AppCompatActivity() {
 
     // mais novos primeiro, logo abaixo do campo de escrever
     private fun loadComments() {
-        commentsRef.orderBy("createdAt", Query.Direction.DESCENDING).get()
-            .addOnSuccessListener { result ->
-                val comments = result.toObjects(Comment::class.java)
+        commentRepository.getAll(eventId)
+            .addOnSuccessListener { comments ->
                 rvComments.adapter = CommentAdapter(
                     comments,
-                    authRepository.requireUserId(),
+                    uid,
                     onEdit = { comment -> showEditDialog(comment) },
                     onDelete = { comment -> confirmDelete(comment) }
                 )
@@ -436,15 +399,7 @@ class EventDetailsActivity : AppCompatActivity() {
         // evita publicar duas vezes com toques repetidos
         layoutComment.isEnabled = false
 
-        val comment = hashMapOf(
-            "userId" to authRepository.requireUserId(),
-            "authorName" to userName,
-            "text" to text,
-            // a data vem do servidor, não do relógio do celular
-            "createdAt" to FieldValue.serverTimestamp()
-        )
-
-        commentsRef.add(comment)
+        commentRepository.add(eventId, uid, userName, text)
             .addOnSuccessListener {
                 layoutComment.isEnabled = true
                 edtComment.text = null
@@ -482,11 +437,7 @@ class EventDetailsActivity : AppCompatActivity() {
         // nada mudou, não precisa gravar nem marcar como editado
         if (newText == comment.text) return
 
-        val changes = mapOf(
-            "text" to newText,
-            "editedAt" to FieldValue.serverTimestamp()
-        )
-        commentsRef.document(comment.id).update(changes)
+        commentRepository.update(eventId, comment.id, newText)
             .addOnSuccessListener {
                 Toast.makeText(this, R.string.comment_updated, Toast.LENGTH_SHORT).show()
                 loadComments()
@@ -505,7 +456,7 @@ class EventDetailsActivity : AppCompatActivity() {
     }
 
     private fun deleteComment(comment: Comment) {
-        commentsRef.document(comment.id).delete()
+        commentRepository.delete(eventId, comment.id)
             .addOnSuccessListener {
                 Toast.makeText(this, R.string.comment_deleted, Toast.LENGTH_SHORT).show()
                 loadComments()

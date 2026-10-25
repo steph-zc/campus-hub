@@ -19,11 +19,11 @@ import br.com.uri.campushub.data.model.Event
 import br.com.uri.campushub.data.repository.AuthRepository
 import br.com.uri.campushub.data.repository.EnrollmentRepository
 import br.com.uri.campushub.data.repository.EventRepository
+import br.com.uri.campushub.data.repository.FavoriteRepository
 import br.com.uri.campushub.ui.details.EventDetailsActivity
 import com.google.android.gms.tasks.Task
 import com.google.android.material.appbar.AppBarLayout
 import com.google.android.material.appbar.MaterialToolbar
-import com.google.firebase.firestore.FirebaseFirestore
 
 // mostra os eventos de uma subcoleção do aluno: as inscrições (Meus eventos) ou os favoritos
 class MyEventsActivity : AppCompatActivity() {
@@ -47,7 +47,7 @@ class MyEventsActivity : AppCompatActivity() {
     private val authRepository = AuthRepository()
     private val eventRepository = EventRepository()
     private val enrollmentRepository = EnrollmentRepository()
-    private val db = FirebaseFirestore.getInstance()
+    private val favoriteRepository = FavoriteRepository()
 
     // qual lista mostrar; sem extra abre as inscrições
     private lateinit var list: String
@@ -116,8 +116,7 @@ class MyEventsActivity : AppCompatActivity() {
 
     private fun loadEventIds(uid: String): Task<List<String>> =
         if (list == LIST_FAVORITES) {
-            db.collection("users").document(uid).collection("favorites").get()
-                .continueWith { task -> task.result.documents.map { it.id } }
+            favoriteRepository.getEventIds(uid)
         } else {
             enrollmentRepository.getEventIds(uid)
         }
