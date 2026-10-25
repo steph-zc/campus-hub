@@ -17,13 +17,13 @@ import androidx.recyclerview.widget.RecyclerView
 import br.com.uri.campushub.R
 import br.com.uri.campushub.data.model.Event
 import br.com.uri.campushub.data.repository.AuthRepository
+import br.com.uri.campushub.data.repository.EnrollmentRepository
+import br.com.uri.campushub.data.repository.EventRepository
 import br.com.uri.campushub.ui.details.EventDetailsActivity
-import com.google.android.gms.tasks.Tasks
+import com.google.android.gms.tasks.Task
 import com.google.android.material.appbar.AppBarLayout
 import com.google.android.material.appbar.MaterialToolbar
-import com.google.firebase.firestore.FieldPath
 import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.QuerySnapshot
 
 // mostra os eventos de uma subcoleção do aluno: as inscrições (Meus eventos) ou os favoritos
 class MyEventsActivity : AppCompatActivity() {
@@ -45,9 +45,11 @@ class MyEventsActivity : AppCompatActivity() {
     private lateinit var progressBar: ProgressBar
 
     private val authRepository = AuthRepository()
+    private val eventRepository = EventRepository()
+    private val enrollmentRepository = EnrollmentRepository()
     private val db = FirebaseFirestore.getInstance()
 
-    // nome da subcoleção em users/{uid}; sem extra abre as inscrições
+    // qual lista mostrar; sem extra abre as inscrições
     private lateinit var list: String
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -102,37 +104,23 @@ class MyEventsActivity : AppCompatActivity() {
         }
     }
 
+    // 1º passo: os ids dos eventos inscritos ou favoritados; 2º passo: os eventos com esses ids
     private fun loadMyEvents() {
         val uid = authRepository.requireUserId()
 
-        // 1º passo: os ids dos eventos inscritos ou favoritados
-        db.collection("users").document(uid).collection(list).get()
-            .addOnSuccessListener { result ->
-                val eventIds = result.documents.map { it.id }
-                if (eventIds.isEmpty()) {
-                    showEvents(emptyList())
-                } else {
-                    loadEvents(eventIds)
-                }
-            }
+        loadEventIds(uid)
+            .onSuccessTask { ids -> eventRepository.getByIds(ids) }
+            .addOnSuccessListener { events -> showEvents(events) }
             .addOnFailureListener { error -> showError(error) }
     }
 
-    // 2º passo: os eventos com esses ids; o whereIn aceita até 30 ids por consulta
-    private fun loadEvents(eventIds: List<String>) {
-        val queries = eventIds.chunked(30).map { ids ->
-            db.collection("events").whereIn(FieldPath.documentId(), ids).get()
+    private fun loadEventIds(uid: String): Task<List<String>> =
+        if (list == LIST_FAVORITES) {
+            db.collection("users").document(uid).collection("favorites").get()
+                .continueWith { task -> task.result.documents.map { it.id } }
+        } else {
+            enrollmentRepository.getEventIds(uid)
         }
-
-        Tasks.whenAllSuccess<QuerySnapshot>(queries)
-            .addOnSuccessListener { results ->
-                val events = results
-                    .flatMap { it.toObjects(Event::class.java) }
-                    .sortedBy { it.date }
-                showEvents(events)
-            }
-            .addOnFailureListener { error -> showError(error) }
-    }
 
     private fun showEvents(events: List<Event>) {
         progressBar.visibility = View.GONE

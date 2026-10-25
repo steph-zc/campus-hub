@@ -20,6 +20,9 @@ import br.com.uri.campushub.R
 import br.com.uri.campushub.data.model.Comment
 import br.com.uri.campushub.data.model.Event
 import br.com.uri.campushub.data.repository.AuthRepository
+import br.com.uri.campushub.data.repository.EnrollmentRepository
+import br.com.uri.campushub.data.repository.EventRepository
+import br.com.uri.campushub.data.repository.UserRepository
 import br.com.uri.campushub.ui.events.EventChips
 import com.google.android.gms.tasks.Tasks
 import com.google.android.material.appbar.AppBarLayout
@@ -33,10 +36,8 @@ import com.google.firebase.firestore.AggregateField
 import com.google.firebase.firestore.AggregateSource
 import com.google.firebase.firestore.CollectionReference
 import com.google.firebase.firestore.DocumentReference
-import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.firestore.Query
 import java.util.Locale
 
@@ -73,11 +74,16 @@ class EventDetailsActivity : AppCompatActivity() {
     private lateinit var rvComments: RecyclerView
 
     private val authRepository = AuthRepository()
+    private val userRepository = UserRepository()
+    private val eventRepository = EventRepository()
+    private val enrollmentRepository = EnrollmentRepository()
     private val db = FirebaseFirestore.getInstance()
+
+    private lateinit var eventId: String
+    private lateinit var uid: String
 
     private lateinit var eventRef: DocumentReference
     private lateinit var userRef: DocumentReference
-    private lateinit var enrollmentRef: DocumentReference
     private lateinit var favoriteRef: DocumentReference
     private lateinit var commentsRef: CollectionReference
     private lateinit var ratingRef: DocumentReference
@@ -125,12 +131,10 @@ class EventDetailsActivity : AppCompatActivity() {
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
         applySystemBarsPadding()
 
-        val eventId = intent.getStringExtra(EXTRA_EVENT_ID)!!
-        val uid = authRepository.requireUserId()
+        eventId = intent.getStringExtra(EXTRA_EVENT_ID)!!
+        uid = authRepository.requireUserId()
         eventRef = db.collection("events").document(eventId)
         userRef = db.collection("users").document(uid)
-        // a inscrição usa o id do evento, então cada aluno só tem uma por evento
-        enrollmentRef = userRef.collection("enrollments").document(eventId)
         // favorito é separado da inscrição: favoritar não reserva vaga
         favoriteRef = userRef.collection("favorites").document(eventId)
         // os comentários ficam dentro do evento, visíveis para todos os alunos
@@ -224,22 +228,28 @@ class EventDetailsActivity : AppCompatActivity() {
 
     // busca o evento, o curso do aluno, a inscrição, o favorito e a avaliação ao mesmo tempo
     private fun loadData() {
-        Tasks.whenAllSuccess<DocumentSnapshot>(
-            eventRef.get(), userRef.get(), enrollmentRef.get(), favoriteRef.get(), ratingRef.get()
-        )
-            .addOnSuccessListener { results ->
-                val event = results[0].toObject(Event::class.java)
+        val eventTask = eventRepository.get(eventId)
+        val userTask = userRepository.get(uid)
+        val enrolledTask = enrollmentRepository.isEnrolled(uid, eventId)
+        val favoriteTask = favoriteRef.get()
+        val ratingTask = ratingRef.get()
+
+        // espera as cinco buscas terminarem e depois lê o resultado de cada uma
+        Tasks.whenAllSuccess<Any>(eventTask, userTask, enrolledTask, favoriteTask, ratingTask)
+            .addOnSuccessListener {
+                val event = eventTask.result
                 if (event == null) {
                     Toast.makeText(this, R.string.event_not_found, Toast.LENGTH_LONG).show()
                     finish()
                     return@addOnSuccessListener
                 }
-                val userCourse = results[1].getString("course") ?: ""
-                userName = results[1].getString("name") ?: ""
-                val isEnrolled = results[2].exists()
-                isFavorite = results[3].exists()
+                val user = userTask.result
+                val userCourse = user?.course ?: ""
+                userName = user?.name ?: ""
+                val isEnrolled = enrolledTask.result
+                isFavorite = favoriteTask.result.exists()
                 // 0 = ainda não avaliou
-                val myRating = results[4].getLong("value")?.toInt() ?: 0
+                val myRating = ratingTask.result.getLong("value")?.toInt() ?: 0
                 invalidateOptionsMenu()
                 showEvent(event, userCourse, isEnrolled)
                 showRatingState(event, isEnrolled, myRating)
@@ -362,33 +372,20 @@ class EventDetailsActivity : AppCompatActivity() {
     private fun enroll() {
         btnEnroll.isEnabled = false
 
-        // a transação lê e grava junto: se dois alunos pegarem a última vaga
-        // ao mesmo tempo, o Firestore repete uma delas e ela encontra o evento lotado
-        db.runTransaction { transaction ->
-            val event = transaction.get(eventRef).toObject(Event::class.java)!!
-            val enrollment = transaction.get(enrollmentRef)
-
-            if (enrollment.exists()) {
-                return@runTransaction null
-            }
-            if (event.remainingSpots() == 0) {
-                throw FirebaseFirestoreException(getString(R.string.sold_out),
-                    FirebaseFirestoreException.Code.ABORTED)
-            }
-
-            val data = hashMapOf(
-                "eventId" to eventRef.id,
-                "enrolledAt" to FieldValue.serverTimestamp()
-            )
-            transaction.set(enrollmentRef, data)
-            transaction.update(eventRef, "enrolledCount", FieldValue.increment(1))
-            null
-        }
+        enrollmentRepository.enroll(uid, eventId)
             .addOnSuccessListener {
                 Toast.makeText(this, R.string.enrolled_success, Toast.LENGTH_SHORT).show()
                 loadData()
             }
-            .addOnFailureListener { error -> showError(error) }
+            .addOnFailureListener { error ->
+                // outro aluno pegou a última vaga enquanto a tela estava aberta
+                if (EnrollmentRepository.isSoldOut(error)) {
+                    Toast.makeText(this, R.string.sold_out, Toast.LENGTH_LONG).show()
+                    loadData()
+                } else {
+                    showError(error)
+                }
+            }
     }
 
     private fun confirmCancel() {
@@ -402,16 +399,7 @@ class EventDetailsActivity : AppCompatActivity() {
     private fun cancelEnrollment() {
         btnCancelEnrollment.isEnabled = false
 
-        db.runTransaction { transaction ->
-            val enrollment = transaction.get(enrollmentRef)
-
-            // só devolve a vaga se a inscrição existia mesmo
-            if (enrollment.exists()) {
-                transaction.delete(enrollmentRef)
-                transaction.update(eventRef, "enrolledCount", FieldValue.increment(-1))
-            }
-            null
-        }
+        enrollmentRepository.cancel(uid, eventId)
             .addOnSuccessListener {
                 Toast.makeText(this, R.string.enrollment_canceled, Toast.LENGTH_SHORT).show()
                 loadData()

@@ -17,9 +17,9 @@ import androidx.core.widget.doAfterTextChanged
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import br.com.uri.campushub.R
-import br.com.uri.campushub.data.SampleEvents
 import br.com.uri.campushub.data.model.Event
 import br.com.uri.campushub.data.repository.AuthRepository
+import br.com.uri.campushub.data.repository.EventRepository
 import br.com.uri.campushub.data.repository.UserRepository
 import br.com.uri.campushub.ui.auth.MainActivity
 import br.com.uri.campushub.ui.details.EventDetailsActivity
@@ -29,7 +29,6 @@ import com.google.android.material.appbar.MaterialToolbar
 import com.google.android.material.chip.Chip
 import com.google.android.material.chip.ChipGroup
 import com.google.android.material.textfield.TextInputEditText
-import com.google.firebase.firestore.FirebaseFirestore
 import java.text.Normalizer
 
 class EventsActivity : AppCompatActivity() {
@@ -46,7 +45,7 @@ class EventsActivity : AppCompatActivity() {
 
     private val authRepository = AuthRepository()
     private val userRepository = UserRepository()
-    private val db = FirebaseFirestore.getInstance()
+    private val eventRepository = EventRepository()
 
     // todos os eventos do Firestore; a lista mostrada é esta depois de filtrada
     private var allEvents = listOf<Event>()
@@ -123,11 +122,11 @@ class EventsActivity : AppCompatActivity() {
     }
 
     private fun loadEvents() {
-        db.collection("events").orderBy("date").get()
-            .addOnSuccessListener { result ->
-                if (result.isEmpty) {
+        eventRepository.getAll()
+            .addOnSuccessListener { events ->
+                if (events.isEmpty()) {
                     // primeira execução: cria os eventos de exemplo e busca de novo
-                    SampleEvents.save(db)
+                    eventRepository.saveSampleEvents()
                         .addOnSuccessListener { loadEvents() }
                         .addOnFailureListener { error -> showError(error) }
                     return@addOnSuccessListener
@@ -135,7 +134,7 @@ class EventsActivity : AppCompatActivity() {
 
                 // próximos primeiro, do mais perto para o mais longe;
                 // depois os encerrados, do mais recente para o mais antigo
-                val (ended, upcoming) = result.toObjects(Event::class.java).partition { it.hasEnded() }
+                val (ended, upcoming) = events.partition { it.hasEnded() }
                 allEvents = upcoming + ended.reversed()
                 progressBar.visibility = View.GONE
                 // reaplica a busca, caso o aluno tenha voltado de outra tela com texto digitado
