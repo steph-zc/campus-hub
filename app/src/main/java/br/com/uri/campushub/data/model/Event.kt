@@ -26,7 +26,8 @@ data class Event(
     fun remainingSpots() = (capacity - enrolledCount).coerceAtLeast(0)
 
     // não pode começar com "is": o Firestore acharia que é um campo e gravaria no documento
-    fun hasEnded() = date != null && date.toDate().before(Date())
+    // "now" tem valor padrão; os testes podem passar outra data para simular o tempo
+    fun hasEnded(now: Date = Date()) = date != null && date.toDate().before(now)
 
     // exclusivos só aceitam alunos do mesmo curso
     fun acceptsCourse(userCourse: String) = openToAll || course == userCourse

@@ -26,6 +26,8 @@ import br.com.uri.campushub.data.repository.EventRepository
 import br.com.uri.campushub.data.repository.FavoriteRepository
 import br.com.uri.campushub.data.repository.RatingRepository
 import br.com.uri.campushub.data.repository.UserRepository
+import br.com.uri.campushub.domain.EnrollmentRules
+import br.com.uri.campushub.domain.RatingRules
 import br.com.uri.campushub.ui.events.EventChips
 import com.google.android.gms.tasks.Tasks
 import com.google.android.material.appbar.AppBarLayout
@@ -253,9 +255,8 @@ class EventDetailsActivity : AppCompatActivity() {
         scrollContent.visibility = View.VISIBLE
     }
 
-    // avaliar exige as duas coisas: ter se inscrito e o evento já ter acontecido
     private fun showRatingState(event: Event, isEnrolled: Boolean, myRating: Int) {
-        if (!isEnrolled || !event.hasEnded()) {
+        if (!RatingRules.canRate(event, isEnrolled)) {
             cardRating.visibility = View.GONE
             return
         }
@@ -288,9 +289,9 @@ class EventDetailsActivity : AppCompatActivity() {
     }
 
     private fun saveRating(stars: Int) {
-        // o RatingBar deixa arrastar até 0, mas a nota mínima é 1
-        val value = stars.coerceAtLeast(1)
-        if (stars < 1) ratingBar.rating = 1f
+        val value = RatingRules.normalizeStars(stars)
+        // se o aluno arrastou até 0, as estrelas voltam para a nota que vai ser salva
+        if (value != stars) ratingBar.rating = value.toFloat()
 
         ratingRepository.save(uid, eventId, value)
             .addOnSuccessListener {
@@ -307,28 +308,18 @@ class EventDetailsActivity : AppCompatActivity() {
     private fun showEnrollmentState(event: Event, userCourse: String, isEnrolled: Boolean) {
         txtEnrolled.visibility = if (isEnrolled) View.VISIBLE else View.GONE
         txtEnrolled.setText(if (event.hasEnded()) R.string.attended_banner else R.string.enrolled_banner)
-        // depois que o evento acontece não dá mais para cancelar
-        btnCancelEnrollment.visibility = if (isEnrolled && !event.hasEnded()) View.VISIBLE else View.GONE
+        btnCancelEnrollment.visibility =
+            if (EnrollmentRules.canCancel(event, isEnrolled)) View.VISIBLE else View.GONE
         btnEnroll.visibility = if (isEnrolled) View.GONE else View.VISIBLE
 
-        // o botão fica desativado mostrando o motivo
-        when {
-            event.hasEnded() -> {
-                btnEnroll.isEnabled = false
-                btnEnroll.setText(R.string.event_ended)
-            }
-            !event.acceptsCourse(userCourse) -> {
-                btnEnroll.isEnabled = false
-                btnEnroll.text = getString(R.string.only_for_course, event.course)
-            }
-            event.remainingSpots() == 0 -> {
-                btnEnroll.isEnabled = false
-                btnEnroll.setText(R.string.sold_out)
-            }
-            else -> {
-                btnEnroll.isEnabled = true
-                btnEnroll.setText(R.string.enroll)
-            }
+        // a regra diz se pode; a tela escolhe o texto do botão para cada motivo
+        val status = EnrollmentRules.check(event, userCourse)
+        btnEnroll.isEnabled = status == EnrollmentRules.Status.ALLOWED
+        btnEnroll.text = when (status) {
+            EnrollmentRules.Status.ENDED -> getString(R.string.event_ended)
+            EnrollmentRules.Status.OTHER_COURSE -> getString(R.string.only_for_course, event.course)
+            EnrollmentRules.Status.SOLD_OUT -> getString(R.string.sold_out)
+            EnrollmentRules.Status.ALLOWED -> getString(R.string.enroll)
         }
         btnCancelEnrollment.isEnabled = true
     }

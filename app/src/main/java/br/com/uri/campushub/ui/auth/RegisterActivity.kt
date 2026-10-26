@@ -11,6 +11,7 @@ import br.com.uri.campushub.R
 import br.com.uri.campushub.data.model.User
 import br.com.uri.campushub.data.repository.AuthRepository
 import br.com.uri.campushub.data.repository.UserRepository
+import br.com.uri.campushub.domain.RegisterValidator
 import br.com.uri.campushub.ui.events.EventsActivity
 
 class RegisterActivity : AppCompatActivity() {
@@ -49,25 +50,19 @@ class RegisterActivity : AppCompatActivity() {
         val password = edtPassword.text.toString()
         val confirmPassword = edtConfirmPassword.text.toString()
 
-        // o Firebase fecha o app se receber email ou senha vazios
-        if (name.isEmpty() || email.isEmpty() || password.isEmpty() || confirmPassword.isEmpty()) {
-            Toast.makeText(this, R.string.fill_all_fields, Toast.LENGTH_SHORT).show()
-            return
+        // a posição 0 do Spinner é o texto "Selecione o curso"
+        val result = RegisterValidator.validate(
+            name, spnCourse.selectedItemPosition != 0, email, password, confirmPassword
+        )
+        val error = when (result) {
+            RegisterValidator.Result.EMPTY_FIELDS -> R.string.fill_all_fields
+            RegisterValidator.Result.NO_COURSE -> R.string.select_course
+            RegisterValidator.Result.SHORT_PASSWORD -> R.string.short_password
+            RegisterValidator.Result.PASSWORDS_DONT_MATCH -> R.string.passwords_dont_match
+            RegisterValidator.Result.VALID -> null
         }
-
-        // a posição 0 é o texto "Selecione o curso"
-        if (spnCourse.selectedItemPosition == 0) {
-            Toast.makeText(this, R.string.select_course, Toast.LENGTH_SHORT).show()
-            return
-        }
-
-        if (password.length < 6) {
-            Toast.makeText(this, R.string.short_password, Toast.LENGTH_SHORT).show()
-            return
-        }
-
-        if (password != confirmPassword) {
-            Toast.makeText(this, R.string.passwords_dont_match, Toast.LENGTH_SHORT).show()
+        if (error != null) {
+            Toast.makeText(this, error, Toast.LENGTH_SHORT).show()
             return
         }
 

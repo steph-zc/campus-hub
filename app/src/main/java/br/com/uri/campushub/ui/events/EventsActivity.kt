@@ -21,6 +21,7 @@ import br.com.uri.campushub.data.model.Event
 import br.com.uri.campushub.data.repository.AuthRepository
 import br.com.uri.campushub.data.repository.EventRepository
 import br.com.uri.campushub.data.repository.UserRepository
+import br.com.uri.campushub.domain.EventFilter
 import br.com.uri.campushub.ui.auth.MainActivity
 import br.com.uri.campushub.ui.details.EventDetailsActivity
 import br.com.uri.campushub.ui.profile.ProfileActivity
@@ -29,7 +30,6 @@ import com.google.android.material.appbar.MaterialToolbar
 import com.google.android.material.chip.Chip
 import com.google.android.material.chip.ChipGroup
 import com.google.android.material.textfield.TextInputEditText
-import java.text.Normalizer
 
 class EventsActivity : AppCompatActivity() {
 
@@ -132,10 +132,7 @@ class EventsActivity : AppCompatActivity() {
                     return@addOnSuccessListener
                 }
 
-                // próximos primeiro, do mais perto para o mais longe;
-                // depois os encerrados, do mais recente para o mais antigo
-                val (ended, upcoming) = events.partition { it.hasEnded() }
-                allEvents = upcoming + ended.reversed()
+                allEvents = EventFilter.sortForList(events)
                 progressBar.visibility = View.GONE
                 // reaplica a busca, caso o aluno tenha voltado de outra tela com texto digitado
                 applyFilters()
@@ -143,23 +140,17 @@ class EventsActivity : AppCompatActivity() {
             .addOnFailureListener { error -> showError(error) }
     }
 
-    // os três filtros valem juntos: título, situação e categoria
+    // lê o que está marcado na tela e deixa o EventFilter decidir quais eventos aparecem
     private fun applyFilters() {
         val typed = edtSearch.text.toString().trim()
-        val query = normalize(typed)
-        val status = groupStatus.checkedChipId
+        val status = when (groupStatus.checkedChipId) {
+            R.id.chipUpcoming -> EventFilter.Status.UPCOMING
+            R.id.chipEnded -> EventFilter.Status.ENDED
+            else -> EventFilter.Status.ALL
+        }
         val category = findViewById<Chip>(groupCategory.checkedChipId)?.tag as String? ?: ""
 
-        val events = allEvents.filter { event ->
-            val matchesTitle = normalize(event.title).contains(query)
-            val matchesStatus = when (status) {
-                R.id.chipUpcoming -> !event.hasEnded()
-                R.id.chipEnded -> event.hasEnded()
-                else -> true
-            }
-            val matchesCategory = category.isEmpty() || event.category == category
-            matchesTitle && matchesStatus && matchesCategory
-        }
+        val events = EventFilter.filter(allEvents, typed, status, category)
 
         rvEvents.adapter = EventAdapter(events) { event -> openDetails(event) }
 
@@ -171,14 +162,6 @@ class EventsActivity : AppCompatActivity() {
         } else {
             getString(R.string.no_results_filters)
         }
-    }
-
-    // "Palestra Inteligência" e "palestra inteligencia" ficam iguais:
-    // tira os acentos e deixa tudo minúsculo antes de comparar
-    private fun normalize(text: String): String {
-        val withoutAccents = Normalizer.normalize(text, Normalizer.Form.NFD)
-            .replace(Regex("\\p{Mn}+"), "")
-        return withoutAccents.lowercase()
     }
 
     private fun hideKeyboard() {
