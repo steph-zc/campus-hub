@@ -26,13 +26,16 @@
 
         <activity android:name=".ui.auth.LoginActivity" />
 
+        <!-- adjustResize: o teclado não empurra a janela; o app reserva o espaço dele (ScreenSetup) -->
         <activity
             android:name=".ui.events.EventsActivity"
-            android:theme="@style/Theme.CampusHub.NoActionBar" />
+            android:theme="@style/Theme.CampusHub.NoActionBar"
+            android:windowSoftInputMode="adjustResize" />
 
         <activity
             android:name=".ui.details.EventDetailsActivity"
-            android:theme="@style/Theme.CampusHub.NoActionBar" />
+            android:theme="@style/Theme.CampusHub.NoActionBar"
+            android:windowSoftInputMode="adjustResize" />
 
         <activity
             android:name=".ui.events.MyEventsActivity"
@@ -40,7 +43,8 @@
 
         <activity
             android:name=".ui.profile.ProfileActivity"
-            android:theme="@style/Theme.CampusHub.NoActionBar" />
+            android:theme="@style/Theme.CampusHub.NoActionBar"
+            android:windowSoftInputMode="adjustResize" />
 
     </application>
 

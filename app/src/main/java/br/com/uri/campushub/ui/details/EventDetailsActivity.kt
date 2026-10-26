@@ -11,8 +11,6 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.view.ViewCompat
-import androidx.core.view.WindowInsetsCompat
 import androidx.core.widget.NestedScrollView
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -28,6 +26,8 @@ import br.com.uri.campushub.data.repository.RatingRepository
 import br.com.uri.campushub.data.repository.UserRepository
 import br.com.uri.campushub.domain.EnrollmentRules
 import br.com.uri.campushub.domain.RatingRules
+import br.com.uri.campushub.ui.common.applySystemBarsPadding
+import br.com.uri.campushub.ui.common.setupToolbar
 import br.com.uri.campushub.ui.events.EventChips
 import com.google.android.gms.tasks.Tasks
 import com.google.android.material.appbar.AppBarLayout
@@ -120,10 +120,8 @@ class EventDetailsActivity : AppCompatActivity() {
 
         rvComments.layoutManager = LinearLayoutManager(this)
 
-        // seta de voltar na barra
-        setSupportActionBar(toolbar)
-        supportActionBar?.setDisplayHomeAsUpEnabled(true)
-        applySystemBarsPadding()
+        setupToolbar(toolbar)
+        applySystemBarsPadding(findViewById(R.id.root), appBar, scrollContent)
 
         eventId = intent.getStringExtra(EXTRA_EVENT_ID)!!
         uid = authRepository.requireUserId()
@@ -139,11 +137,6 @@ class EventDetailsActivity : AppCompatActivity() {
 
         loadData()
         loadComments()
-    }
-
-    override fun onSupportNavigateUp(): Boolean {
-        finish()
-        return true
     }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
@@ -191,16 +184,6 @@ class EventDetailsActivity : AppCompatActivity() {
                 invalidateOptionsMenu()
                 Toast.makeText(this, error.message, Toast.LENGTH_LONG).show()
             }
-    }
-
-    private fun applySystemBarsPadding() {
-        val space = resources.getDimensionPixelSize(R.dimen.list_padding)
-        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.root)) { _, insets ->
-            val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
-            appBar.setPadding(0, bars.top, 0, 0)
-            scrollContent.setPadding(space, space, space, space + bars.bottom)
-            insets
-        }
     }
 
     // busca o evento, o curso do aluno, a inscrição, o favorito e a avaliação ao mesmo tempo

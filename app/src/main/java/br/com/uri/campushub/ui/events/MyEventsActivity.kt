@@ -10,8 +10,6 @@ import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.view.ViewCompat
-import androidx.core.view.WindowInsetsCompat
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import br.com.uri.campushub.R
@@ -20,6 +18,8 @@ import br.com.uri.campushub.data.repository.AuthRepository
 import br.com.uri.campushub.data.repository.EnrollmentRepository
 import br.com.uri.campushub.data.repository.EventRepository
 import br.com.uri.campushub.data.repository.FavoriteRepository
+import br.com.uri.campushub.ui.common.applySystemBarsPadding
+import br.com.uri.campushub.ui.common.setupToolbar
 import br.com.uri.campushub.ui.details.EventDetailsActivity
 import com.google.android.gms.tasks.Task
 import com.google.android.material.appbar.AppBarLayout
@@ -74,10 +74,9 @@ class MyEventsActivity : AppCompatActivity() {
             txtEmptyHint.setText(R.string.no_favorites_hint)
         }
 
-        setSupportActionBar(toolbar)
-        supportActionBar?.setDisplayHomeAsUpEnabled(true)
+        setupToolbar(toolbar)
         rvEvents.layoutManager = LinearLayoutManager(this)
-        applySystemBarsPadding()
+        applySystemBarsPadding(findViewById(R.id.root), appBar, rvEvents)
 
         // a lista de eventos é a tela anterior, então basta fechar esta
         btnBrowseEvents.setOnClickListener { finish() }
@@ -87,21 +86,6 @@ class MyEventsActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         loadMyEvents()
-    }
-
-    override fun onSupportNavigateUp(): Boolean {
-        finish()
-        return true
-    }
-
-    private fun applySystemBarsPadding() {
-        val space = resources.getDimensionPixelSize(R.dimen.list_padding)
-        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.root)) { _, insets ->
-            val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
-            appBar.setPadding(0, bars.top, 0, 0)
-            rvEvents.setPadding(space, space, space, space + bars.bottom)
-            insets
-        }
     }
 
     // 1º passo: os ids dos eventos inscritos ou favoritados; 2º passo: os eventos com esses ids

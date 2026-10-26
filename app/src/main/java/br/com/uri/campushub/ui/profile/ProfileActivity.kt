@@ -9,14 +9,14 @@ import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.view.ViewCompat
-import androidx.core.view.WindowInsetsCompat
 import androidx.core.widget.NestedScrollView
 import br.com.uri.campushub.R
 import br.com.uri.campushub.data.repository.AuthRepository
 import br.com.uri.campushub.data.repository.UserRepository
 import br.com.uri.campushub.ui.auth.MainActivity
 import br.com.uri.campushub.ui.common.Avatar
+import br.com.uri.campushub.ui.common.applySystemBarsPadding
+import br.com.uri.campushub.ui.common.setupToolbar
 import com.google.android.material.appbar.AppBarLayout
 import com.google.android.material.appbar.MaterialToolbar
 import com.google.android.material.button.MaterialButton
@@ -58,9 +58,8 @@ class ProfileActivity : AppCompatActivity() {
         btnSave = findViewById(R.id.btnSave)
         btnLogout = findViewById(R.id.btnLogout)
 
-        setSupportActionBar(toolbar)
-        supportActionBar?.setDisplayHomeAsUpEnabled(true)
-        applySystemBarsPadding()
+        setupToolbar(toolbar)
+        applySystemBarsPadding(findViewById(R.id.root), appBar, scrollContent)
 
         courses = resources.getStringArray(R.array.courses).drop(1)
         dropCourse.setAdapter(ArrayAdapter(this, android.R.layout.simple_list_item_1, courses))
@@ -69,21 +68,6 @@ class ProfileActivity : AppCompatActivity() {
         btnLogout.setOnClickListener { logout() }
 
         loadProfile()
-    }
-
-    override fun onSupportNavigateUp(): Boolean {
-        finish()
-        return true
-    }
-
-    private fun applySystemBarsPadding() {
-        val space = resources.getDimensionPixelSize(R.dimen.list_padding)
-        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.root)) { _, insets ->
-            val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
-            appBar.setPadding(0, bars.top, 0, 0)
-            scrollContent.setPadding(space, space, space, space + bars.bottom)
-            insets
-        }
     }
 
     private fun loadProfile() {

@@ -11,8 +11,6 @@ import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.view.ViewCompat
-import androidx.core.view.WindowInsetsCompat
 import androidx.core.widget.doAfterTextChanged
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -23,6 +21,8 @@ import br.com.uri.campushub.data.repository.EventRepository
 import br.com.uri.campushub.data.repository.UserRepository
 import br.com.uri.campushub.domain.EventFilter
 import br.com.uri.campushub.ui.auth.MainActivity
+import br.com.uri.campushub.ui.common.applySystemBarsPadding
+import br.com.uri.campushub.ui.common.setupToolbar
 import br.com.uri.campushub.ui.details.EventDetailsActivity
 import br.com.uri.campushub.ui.profile.ProfileActivity
 import com.google.android.material.appbar.AppBarLayout
@@ -64,10 +64,10 @@ class EventsActivity : AppCompatActivity() {
         groupCategory = findViewById(R.id.groupCategory)
         txtNoResults = findViewById(R.id.txtNoResults)
 
-        // a Toolbar do layout passa a ser a barra da tela, com o menu
-        setSupportActionBar(toolbar)
+        // tela principal: barra com o menu, sem seta de voltar
+        setupToolbar(toolbar, showBackArrow = false)
         rvEvents.layoutManager = LinearLayoutManager(this)
-        applySystemBarsPadding()
+        applySystemBarsPadding(findViewById(R.id.root), appBar, rvEvents)
 
         // filtra a cada letra digitada, sem precisar consultar o Firestore de novo
         edtSearch.doAfterTextChanged { applyFilters() }
@@ -100,18 +100,6 @@ class EventsActivity : AppCompatActivity() {
         super.onResume()
         loadUserName()
         loadEvents()
-    }
-
-    // no Android 15+ o app desenha atrás das barras do sistema, então
-    // o topo desce até sair da barra de status e a lista termina acima da barra de navegação
-    private fun applySystemBarsPadding() {
-        val space = resources.getDimensionPixelSize(R.dimen.list_padding)
-        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.root)) { _, insets ->
-            val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
-            appBar.setPadding(0, bars.top, 0, 0)
-            rvEvents.setPadding(space, space, space, space + bars.bottom)
-            insets
-        }
     }
 
     private fun loadUserName() {
