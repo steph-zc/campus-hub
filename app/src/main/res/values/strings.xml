@@ -30,6 +30,9 @@
     <string name="course_only">Exclusivo do curso</string>
     <string name="event_details">Detalhes do evento</string>
     <string name="about_event">Sobre o evento</string>
+    <string name="location">Localização</string>
+    <string name="event_map">Mapa com o local do evento</string>
+    <string name="open_in_map">Abrir no mapa</string>
     <string name="event_not_found">Evento não encontrado</string>
     <string name="remaining_spots">%1$d vagas restantes</string>
     <string name="spots_of_capacity">%1$d de %2$d vagas disponíveis</string>

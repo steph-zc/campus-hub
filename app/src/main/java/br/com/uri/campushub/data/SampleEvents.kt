@@ -2,12 +2,18 @@ package br.com.uri.campushub.data
 
 import br.com.uri.campushub.data.model.Event
 import com.google.android.gms.tasks.Task
+import com.google.android.gms.tasks.Tasks
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.GeoPoint
 import java.util.Calendar
 
 // eventos de exemplo gravados quando a coleção "events" ainda está vazia
 object SampleEvents {
+
+    // todos os eventos acontecem no campus da URI Santiago
+    private const val CAMPUS_ADDRESS = "Rua Batista Bonoto Sobrinho, 733 - São Vicente, Santiago - RS"
+    private val CAMPUS_POINT = GeoPoint(-29.1940912, -54.8853573)
 
     private val events = listOf(
         // eventos que já aconteceram, para testar avaliações e o filtro de encerrados
@@ -20,7 +26,9 @@ object SampleEvents {
             capacity = 80,
             course = "Ciência da Computação",
             openToAll = true,
-            category = "Palestra"
+            category = "Palestra",
+            address = CAMPUS_ADDRESS,
+            coordinates = CAMPUS_POINT
         ),
         Event(
             title = "Workshop de Oratória Jurídica",
@@ -31,7 +39,9 @@ object SampleEvents {
             capacity = 35,
             course = "Direito",
             openToAll = false,
-            category = "Workshop"
+            category = "Workshop",
+            address = CAMPUS_ADDRESS,
+            coordinates = CAMPUS_POINT
         ),
         Event(
             title = "Dia de Campo: Manejo do Solo",
@@ -42,7 +52,9 @@ object SampleEvents {
             capacity = 50,
             course = "Agronomia",
             openToAll = true,
-            category = "Visita técnica"
+            category = "Visita técnica",
+            address = CAMPUS_ADDRESS,
+            coordinates = CAMPUS_POINT
         ),
         Event(
             title = "Seminário de Gestão e Empreendedorismo",
@@ -53,7 +65,9 @@ object SampleEvents {
             capacity = 150,
             course = "Administração",
             openToAll = true,
-            category = "Seminário"
+            category = "Seminário",
+            address = CAMPUS_ADDRESS,
+            coordinates = CAMPUS_POINT
         ),
 
         // próximos eventos
@@ -66,7 +80,9 @@ object SampleEvents {
             capacity = 120,
             course = "Ciência da Computação",
             openToAll = false,
-            category = "Semana acadêmica"
+            category = "Semana acadêmica",
+            address = CAMPUS_ADDRESS,
+            coordinates = CAMPUS_POINT
         ),
         Event(
             title = "Palestra: Inteligência Artificial no Agronegócio",
@@ -77,7 +93,9 @@ object SampleEvents {
             capacity = 60,
             course = "Agronomia",
             openToAll = true,
-            category = "Palestra"
+            category = "Palestra",
+            address = CAMPUS_ADDRESS,
+            coordinates = CAMPUS_POINT
         ),
         Event(
             title = "Workshop de Primeiros Socorros",
@@ -88,7 +106,9 @@ object SampleEvents {
             capacity = 30,
             course = "Medicina",
             openToAll = false,
-            category = "Workshop"
+            category = "Workshop",
+            address = CAMPUS_ADDRESS,
+            coordinates = CAMPUS_POINT
         ),
         Event(
             title = "Júri Simulado",
@@ -98,7 +118,9 @@ object SampleEvents {
             capacity = 80,
             course = "Direito",
             openToAll = true,
-            category = "Workshop"
+            category = "Workshop",
+            address = CAMPUS_ADDRESS,
+            coordinates = CAMPUS_POINT
         ),
         Event(
             title = "Feira de Profissões",
@@ -109,7 +131,9 @@ object SampleEvents {
             capacity = 300,
             course = "Administração",
             openToAll = true,
-            category = "Feira"
+            category = "Feira",
+            address = CAMPUS_ADDRESS,
+            coordinates = CAMPUS_POINT
         ),
         Event(
             title = "Visita Técnica a Obra",
@@ -120,7 +144,9 @@ object SampleEvents {
             capacity = 25,
             course = "Engenharia Civil",
             openToAll = false,
-            category = "Visita técnica"
+            category = "Visita técnica",
+            address = CAMPUS_ADDRESS,
+            coordinates = CAMPUS_POINT
         ),
         Event(
             title = "Hackathon CampusHub",
@@ -131,7 +157,9 @@ object SampleEvents {
             capacity = 40,
             course = "Ciência da Computação",
             openToAll = false,
-            category = "Competição"
+            category = "Competição",
+            address = CAMPUS_ADDRESS,
+            coordinates = CAMPUS_POINT
         ),
         Event(
             title = "Seminário de Arquitetura Sustentável",
@@ -142,7 +170,9 @@ object SampleEvents {
             capacity = 100,
             course = "Arquitetura",
             openToAll = true,
-            category = "Seminário"
+            category = "Seminário",
+            address = CAMPUS_ADDRESS,
+            coordinates = CAMPUS_POINT
         )
     )
 
@@ -152,6 +182,23 @@ object SampleEvents {
         for (event in events) {
             batch.set(db.collection("events").document(), event)
         }
+        return batch.commit()
+    }
+
+    // eventos gravados antes de existir o endereço: completa com os dados do exemplo de mesmo título
+    fun addMissingLocations(db: FirebaseFirestore, saved: List<Event>): Task<Void> {
+        val batch = db.batch()
+        var count = 0
+        for (event in saved) {
+            if (event.coordinates != null) continue
+            val sample = events.find { it.title == event.title } ?: continue
+            batch.update(
+                db.collection("events").document(event.id),
+                mapOf("address" to sample.address, "coordinates" to sample.coordinates)
+            )
+            count++
+        }
+        if (count == 0) return Tasks.forResult(null)
         return batch.commit()
     }
 
