@@ -1,4 +1,4 @@
-package br.com.uri.campushub
+package br.com.uri.campushub.ui.events
 
 import android.content.Intent
 import android.os.Bundle
@@ -11,19 +11,25 @@ import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.view.ViewCompat
-import androidx.core.view.WindowInsetsCompat
 import androidx.core.widget.doAfterTextChanged
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import br.com.uri.campushub.R
+import br.com.uri.campushub.data.model.Event
+import br.com.uri.campushub.data.repository.AuthRepository
+import br.com.uri.campushub.data.repository.EventRepository
+import br.com.uri.campushub.data.repository.UserRepository
+import br.com.uri.campushub.domain.EventFilter
+import br.com.uri.campushub.ui.auth.MainActivity
+import br.com.uri.campushub.ui.common.applySystemBarsPadding
+import br.com.uri.campushub.ui.common.setupToolbar
+import br.com.uri.campushub.ui.details.EventDetailsActivity
+import br.com.uri.campushub.ui.profile.ProfileActivity
 import com.google.android.material.appbar.AppBarLayout
 import com.google.android.material.appbar.MaterialToolbar
 import com.google.android.material.chip.Chip
 import com.google.android.material.chip.ChipGroup
 import com.google.android.material.textfield.TextInputEditText
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.firestore.FirebaseFirestore
-import java.text.Normalizer
 
 class EventsActivity : AppCompatActivity() {
 
@@ -37,8 +43,9 @@ class EventsActivity : AppCompatActivity() {
     private lateinit var groupCategory: ChipGroup
     private lateinit var txtNoResults: TextView
 
-    private val auth = FirebaseAuth.getInstance()
-    private val db = FirebaseFirestore.getInstance()
+    private val authRepository = AuthRepository()
+    private val userRepository = UserRepository()
+    private val eventRepository = EventRepository()
 
     // todos os eventos do Firestore; a lista mostrada é esta depois de filtrada
     private var allEvents = listOf<Event>()
@@ -57,10 +64,10 @@ class EventsActivity : AppCompatActivity() {
         groupCategory = findViewById(R.id.groupCategory)
         txtNoResults = findViewById(R.id.txtNoResults)
 
-        // a Toolbar do layout passa a ser a barra da tela, com o menu
-        setSupportActionBar(toolbar)
+        // tela principal: barra com o menu, sem seta de voltar
+        setupToolbar(toolbar, showBackArrow = false)
         rvEvents.layoutManager = LinearLayoutManager(this)
-        applySystemBarsPadding()
+        applySystemBarsPadding(findViewById(R.id.root), appBar, rvEvents)
 
         // filtra a cada letra digitada, sem precisar consultar o Firestore de novo
         edtSearch.doAfterTextChanged { applyFilters() }
@@ -95,43 +102,25 @@ class EventsActivity : AppCompatActivity() {
         loadEvents()
     }
 
-    // no Android 15+ o app desenha atrás das barras do sistema, então
-    // o topo desce até sair da barra de status e a lista termina acima da barra de navegação
-    private fun applySystemBarsPadding() {
-        val space = resources.getDimensionPixelSize(R.dimen.list_padding)
-        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.root)) { _, insets ->
-            val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
-            appBar.setPadding(0, bars.top, 0, 0)
-            rvEvents.setPadding(space, space, space, space + bars.bottom)
-            insets
-        }
-    }
-
     private fun loadUserName() {
-        val uid = auth.currentUser!!.uid
-
-        db.collection("users").document(uid).get()
-            .addOnSuccessListener { document ->
-                val name = document.getString("name")
-                txtHello.text = getString(R.string.hello_user, name)
+        userRepository.get(authRepository.requireUserId())
+            .addOnSuccessListener { user ->
+                txtHello.text = getString(R.string.hello_user, user?.name ?: "")
             }
     }
 
     private fun loadEvents() {
-        db.collection("events").orderBy("date").get()
-            .addOnSuccessListener { result ->
-                if (result.isEmpty) {
+        eventRepository.getAll()
+            .addOnSuccessListener { events ->
+                if (events.isEmpty()) {
                     // primeira execução: cria os eventos de exemplo e busca de novo
-                    SampleEvents.save(db)
+                    eventRepository.saveSampleEvents()
                         .addOnSuccessListener { loadEvents() }
                         .addOnFailureListener { error -> showError(error) }
                     return@addOnSuccessListener
                 }
 
-                // próximos primeiro, do mais perto para o mais longe;
-                // depois os encerrados, do mais recente para o mais antigo
-                val (ended, upcoming) = result.toObjects(Event::class.java).partition { it.hasEnded() }
-                allEvents = upcoming + ended.reversed()
+                allEvents = EventFilter.sortForList(events)
                 progressBar.visibility = View.GONE
                 // reaplica a busca, caso o aluno tenha voltado de outra tela com texto digitado
                 applyFilters()
@@ -139,23 +128,17 @@ class EventsActivity : AppCompatActivity() {
             .addOnFailureListener { error -> showError(error) }
     }
 
-    // os três filtros valem juntos: título, situação e categoria
+    // lê o que está marcado na tela e deixa o EventFilter decidir quais eventos aparecem
     private fun applyFilters() {
         val typed = edtSearch.text.toString().trim()
-        val query = normalize(typed)
-        val status = groupStatus.checkedChipId
+        val status = when (groupStatus.checkedChipId) {
+            R.id.chipUpcoming -> EventFilter.Status.UPCOMING
+            R.id.chipEnded -> EventFilter.Status.ENDED
+            else -> EventFilter.Status.ALL
+        }
         val category = findViewById<Chip>(groupCategory.checkedChipId)?.tag as String? ?: ""
 
-        val events = allEvents.filter { event ->
-            val matchesTitle = normalize(event.title).contains(query)
-            val matchesStatus = when (status) {
-                R.id.chipUpcoming -> !event.hasEnded()
-                R.id.chipEnded -> event.hasEnded()
-                else -> true
-            }
-            val matchesCategory = category.isEmpty() || event.category == category
-            matchesTitle && matchesStatus && matchesCategory
-        }
+        val events = EventFilter.filter(allEvents, typed, status, category)
 
         rvEvents.adapter = EventAdapter(events) { event -> openDetails(event) }
 
@@ -167,14 +150,6 @@ class EventsActivity : AppCompatActivity() {
         } else {
             getString(R.string.no_results_filters)
         }
-    }
-
-    // "Palestra Inteligência" e "palestra inteligencia" ficam iguais:
-    // tira os acentos e deixa tudo minúsculo antes de comparar
-    private fun normalize(text: String): String {
-        val withoutAccents = Normalizer.normalize(text, Normalizer.Form.NFD)
-            .replace(Regex("\\p{Mn}+"), "")
-        return withoutAccents.lowercase()
     }
 
     private fun hideKeyboard() {
@@ -230,7 +205,7 @@ class EventsActivity : AppCompatActivity() {
     }
 
     private fun logout() {
-        auth.signOut()
+        authRepository.logout()
         val intent = Intent(this, MainActivity::class.java)
         intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
         startActivity(intent)

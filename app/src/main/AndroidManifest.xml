@@ -13,7 +13,7 @@
         android:theme="@style/Theme.CampusHub">
 
         <activity
-            android:name=".MainActivity"
+            android:name=".ui.auth.MainActivity"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -22,25 +22,29 @@
             </intent-filter>
         </activity>
 
-        <activity android:name=".RegisterActivity" />
+        <activity android:name=".ui.auth.RegisterActivity" />
 
-        <activity android:name=".LoginActivity" />
+        <activity android:name=".ui.auth.LoginActivity" />
+
+        <!-- adjustResize: o teclado não empurra a janela; o app reserva o espaço dele (ScreenSetup) -->
+        <activity
+            android:name=".ui.events.EventsActivity"
+            android:theme="@style/Theme.CampusHub.NoActionBar"
+            android:windowSoftInputMode="adjustResize" />
 
         <activity
-            android:name=".EventsActivity"
+            android:name=".ui.details.EventDetailsActivity"
+            android:theme="@style/Theme.CampusHub.NoActionBar"
+            android:windowSoftInputMode="adjustResize" />
+
+        <activity
+            android:name=".ui.events.MyEventsActivity"
             android:theme="@style/Theme.CampusHub.NoActionBar" />
 
         <activity
-            android:name=".EventDetailsActivity"
-            android:theme="@style/Theme.CampusHub.NoActionBar" />
-
-        <activity
-            android:name=".MyEventsActivity"
-            android:theme="@style/Theme.CampusHub.NoActionBar" />
-
-        <activity
-            android:name=".ProfileActivity"
-            android:theme="@style/Theme.CampusHub.NoActionBar" />
+            android:name=".ui.profile.ProfileActivity"
+            android:theme="@style/Theme.CampusHub.NoActionBar"
+            android:windowSoftInputMode="adjustResize" />
 
     </application>
 

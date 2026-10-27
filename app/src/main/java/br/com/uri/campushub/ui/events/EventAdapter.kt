@@ -1,10 +1,12 @@
-package br.com.uri.campushub
+package br.com.uri.campushub.ui.events
 
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
+import br.com.uri.campushub.R
+import br.com.uri.campushub.data.model.Event
 import com.google.android.material.chip.Chip
 
 // onClick recebe o evento tocado, quem decide o que fazer é a tela

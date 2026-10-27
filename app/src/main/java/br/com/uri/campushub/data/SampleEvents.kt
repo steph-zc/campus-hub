@@ -1,5 +1,6 @@
-package br.com.uri.campushub
+package br.com.uri.campushub.data
 
+import br.com.uri.campushub.data.model.Event
 import com.google.android.gms.tasks.Task
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.FirebaseFirestore

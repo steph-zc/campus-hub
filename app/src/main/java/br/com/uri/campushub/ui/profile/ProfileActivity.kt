@@ -1,4 +1,4 @@
-package br.com.uri.campushub
+package br.com.uri.campushub.ui.profile
 
 import android.content.Intent
 import android.os.Bundle
@@ -9,15 +9,18 @@ import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.view.ViewCompat
-import androidx.core.view.WindowInsetsCompat
 import androidx.core.widget.NestedScrollView
+import br.com.uri.campushub.R
+import br.com.uri.campushub.data.repository.AuthRepository
+import br.com.uri.campushub.data.repository.UserRepository
+import br.com.uri.campushub.ui.auth.MainActivity
+import br.com.uri.campushub.ui.common.Avatar
+import br.com.uri.campushub.ui.common.applySystemBarsPadding
+import br.com.uri.campushub.ui.common.setupToolbar
 import com.google.android.material.appbar.AppBarLayout
 import com.google.android.material.appbar.MaterialToolbar
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.textfield.TextInputEditText
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.firestore.FirebaseFirestore
 
 class ProfileActivity : AppCompatActivity() {
 
@@ -33,8 +36,8 @@ class ProfileActivity : AppCompatActivity() {
     private lateinit var btnSave: MaterialButton
     private lateinit var btnLogout: MaterialButton
 
-    private val auth = FirebaseAuth.getInstance()
-    private val db = FirebaseFirestore.getInstance()
+    private val authRepository = AuthRepository()
+    private val userRepository = UserRepository()
 
     // mesma lista do cadastro, sem o "Selecione o curso" da posição 0
     private lateinit var courses: List<String>
@@ -55,9 +58,8 @@ class ProfileActivity : AppCompatActivity() {
         btnSave = findViewById(R.id.btnSave)
         btnLogout = findViewById(R.id.btnLogout)
 
-        setSupportActionBar(toolbar)
-        supportActionBar?.setDisplayHomeAsUpEnabled(true)
-        applySystemBarsPadding()
+        setupToolbar(toolbar)
+        applySystemBarsPadding(findViewById(R.id.root), appBar, scrollContent)
 
         courses = resources.getStringArray(R.array.courses).drop(1)
         dropCourse.setAdapter(ArrayAdapter(this, android.R.layout.simple_list_item_1, courses))
@@ -68,34 +70,16 @@ class ProfileActivity : AppCompatActivity() {
         loadProfile()
     }
 
-    override fun onSupportNavigateUp(): Boolean {
-        finish()
-        return true
-    }
-
-    private fun applySystemBarsPadding() {
-        val space = resources.getDimensionPixelSize(R.dimen.list_padding)
-        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.root)) { _, insets ->
-            val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
-            appBar.setPadding(0, bars.top, 0, 0)
-            scrollContent.setPadding(space, space, space, space + bars.bottom)
-            insets
-        }
-    }
-
     private fun loadProfile() {
-        val user = auth.currentUser!!
-
-        db.collection("users").document(user.uid).get()
-            .addOnSuccessListener { document ->
-                val name = document.getString("name") ?: ""
-                val course = document.getString("course") ?: ""
+        userRepository.get(authRepository.requireUserId())
+            .addOnSuccessListener { user ->
+                val name = user?.name ?: ""
 
                 showHeader(name)
-                txtEmail.text = user.email
+                txtEmail.text = authRepository.currentUserEmail()
                 edtName.setText(name)
                 // false para não abrir a lista nem filtrar as opções ao preencher
-                dropCourse.setText(course, false)
+                dropCourse.setText(user?.course ?: "", false)
 
                 progressBar.visibility = View.GONE
                 scrollContent.visibility = View.VISIBLE
@@ -125,11 +109,8 @@ class ProfileActivity : AppCompatActivity() {
         }
 
         btnSave.isEnabled = false
-        val uid = auth.currentUser!!.uid
-        val changes = mapOf("name" to name, "course" to course)
 
-        // update altera só esses campos e mantém o email salvo no documento
-        db.collection("users").document(uid).update(changes)
+        userRepository.update(authRepository.requireUserId(), name, course)
             .addOnSuccessListener {
                 btnSave.isEnabled = true
                 showHeader(name)
@@ -142,7 +123,7 @@ class ProfileActivity : AppCompatActivity() {
     }
 
     private fun logout() {
-        auth.signOut()
+        authRepository.logout()
         val intent = Intent(this, MainActivity::class.java)
         intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
         startActivity(intent)

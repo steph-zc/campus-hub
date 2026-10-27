@@ -109,38 +109,76 @@ Um dos eventos de exemplo na coleção `events`, com o curso e o tipo de acesso:
 
 ## Arquitetura
 
-Cada tela é uma `Activity` com o seu layout XML, e as próprias Activities chamam o Firebase.
+O código é dividido em três camadas. Cada uma só conhece a de baixo:
+
+```mermaid
+flowchart TD
+    ui["ui<br/>Activities e Adapters"] --> domain["domain<br/>regras do app"]
+    ui --> data["data<br/>repositórios e modelos"]
+    domain --> model["data/model"]
+    data --> firebase[("Firebase<br/>Auth e Firestore")]
+```
+
+- **`ui`** mostra os dados e reage aos toques. As telas não chamam o Firebase direto: pedem aos repositórios e perguntam às regras o que pode ser feito.
+- **`data`** é o único lugar que fala com o Firebase. Cada repositório cuida de uma parte dos dados e devolve uma `Task`, que a tela trata com `addOnSuccessListener` e `addOnFailureListener`.
+- **`domain`** guarda as regras do app em Kotlin puro, sem Android nem Firebase: validação do cadastro, busca e filtros, quando o aluno pode se inscrever, cancelar e avaliar. Por isso essas regras podem ser testadas sem emulador.
 
 ```
 app/src/main/
 ├── java/br/com/uri/campushub/
-│   ├── MainActivity.kt           tela inicial e login automático
-│   ├── RegisterActivity.kt       cria a conta e o perfil
-│   ├── LoginActivity.kt          login e recuperação de senha
-│   ├── EventsActivity.kt         lista de eventos, busca e filtros
-│   ├── EventDetailsActivity.kt   detalhes, inscrição, favorito, comentários e avaliação
-│   ├── MyEventsActivity.kt       Meus eventos e Meus favoritos (a mesma tela, com listas diferentes)
-│   ├── ProfileActivity.kt        dados do aluno
-│   ├── Event.kt                  modelo do evento, datas e regras (vagas, encerrado, curso)
-│   ├── Comment.kt                modelo do comentário
-│   ├── EventAdapter.kt           cartões dos eventos
-│   ├── CommentAdapter.kt         lista de comentários e menu de editar/excluir
-│   ├── EventChips.kt             etiquetas de curso e de acesso
-│   ├── Avatar.kt                 iniciais do perfil e dos comentários
-│   └── SampleEvents.kt           eventos de exemplo
+│   ├── ui/
+│   │   ├── auth/
+│   │   │   ├── MainActivity.kt           tela inicial e login automático
+│   │   │   ├── RegisterActivity.kt       cria a conta e o perfil
+│   │   │   └── LoginActivity.kt          login e recuperação de senha
+│   │   ├── events/
+│   │   │   ├── EventsActivity.kt         lista de eventos, busca e filtros
+│   │   │   ├── MyEventsActivity.kt       Meus eventos e Meus favoritos (a mesma tela, com listas diferentes)
+│   │   │   ├── EventAdapter.kt           cartões dos eventos
+│   │   │   └── EventChips.kt             etiquetas de curso e de acesso
+│   │   ├── details/
+│   │   │   ├── EventDetailsActivity.kt   detalhes, inscrição, favorito, comentários e avaliação
+│   │   │   └── CommentAdapter.kt         lista de comentários e menu de editar/excluir
+│   │   ├── profile/
+│   │   │   └── ProfileActivity.kt        dados do aluno
+│   │   └── common/
+│   │       ├── ScreenSetup.kt            barra superior e espaço das barras do sistema e do teclado
+│   │       └── Avatar.kt                 iniciais do perfil e dos comentários
+│   ├── data/
+│   │   ├── model/
+│   │   │   ├── Event.kt                  evento, formatos de data, vagas, encerrado e curso
+│   │   │   ├── Comment.kt                comentário
+│   │   │   ├── User.kt                   perfil do aluno
+│   │   │   └── RatingSummary.kt          média e quantidade de avaliações
+│   │   ├── repository/
+│   │   │   ├── AuthRepository.kt         login, cadastro, recuperação de senha e logout
+│   │   │   ├── UserRepository.kt         perfil em users/{uid}
+│   │   │   ├── EventRepository.kt        lista, um evento ou vários pelos ids
+│   │   │   ├── EnrollmentRepository.kt   inscrição e cancelamento (transações)
+│   │   │   ├── FavoriteRepository.kt     favoritar e desfavoritar
+│   │   │   ├── CommentRepository.kt      listar, criar, editar e excluir comentários
+│   │   │   └── RatingRepository.kt       nota do aluno e média do evento
+│   │   └── SampleEvents.kt               eventos de exemplo
+│   └── domain/
+│       ├── RegisterValidator.kt          validação do cadastro
+│       ├── EventFilter.kt                ordem da lista, busca e filtros
+│       ├── EnrollmentRules.kt            quando se inscrever e cancelar
+│       └── RatingRules.kt                quando avaliar e limites da nota
 ├── res/
-│   ├── layout/                   telas, cartões, itens das listas e diálogos
-│   ├── drawable/                 ícones e fundos
-│   ├── color/                    cores das opções de filtro (marcada ou não)
-│   ├── menu/                     menus da barra e dos comentários
-│   ├── values/                   textos, cores, temas, estilos, cursos e categorias
-│   └── values-night/             cores e temas do modo escuro
+│   ├── layout/                           telas, cartões, itens das listas e diálogos
+│   ├── drawable/                         ícones e fundos
+│   ├── color/                            cores das opções de filtro (marcada ou não)
+│   ├── menu/                             menus da barra e dos comentários
+│   ├── values/                           textos, cores, temas, estilos, cursos e categorias
+│   └── values-night/                     cores e temas do modo escuro
 └── AndroidManifest.xml
 ```
 
+- **Repositórios** recebem o `FirebaseAuth` e o `FirebaseFirestore` pelo construtor, com a instância padrão como valor inicial. As telas usam o padrão, e os testes podem passar o Firebase Emulator.
+- **Regras** devolvem um `enum` com o resultado (por exemplo `EnrollmentRules.Status.SOLD_OUT`). A tela escolhe a mensagem e o estado do botão a partir dele, então a regra não depende de textos nem de layout.
 - **Navegação** com `Intent`. As telas de detalhes recebem só o id do evento e buscam os dados atualizados.
-- **Telas com conteúdo no topo** usam uma `MaterialToolbar` própria e ajustam o espaço das barras do sistema, já que a partir do Android 15 o app desenha atrás delas.
-- **Adapters** só mostram os dados e avisam a tela quando algo é tocado. Quem grava no Firestore são as Activities.
+- **Barras do sistema e teclado:** a partir do Android 15 o app desenha atrás das barras. As telas com barra própria usam o `ScreenSetup.kt`, que reserva o espaço da barra de status, da barra de navegação e do teclado. Assim o campo de comentário continua visível enquanto o aluno digita.
+- **Adapters** só mostram os dados e avisam a tela quando algo é tocado.
 - **Textos** da interface ficam em `strings.xml`, e os cursos e as categorias em `string-array`.
 
 ## Tecnologias

@@ -1,4 +1,4 @@
-package br.com.uri.campushub
+package br.com.uri.campushub.ui.auth
 
 import android.content.Intent
 import android.os.Bundle
@@ -8,7 +8,9 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
-import com.google.firebase.auth.FirebaseAuth
+import br.com.uri.campushub.R
+import br.com.uri.campushub.data.repository.AuthRepository
+import br.com.uri.campushub.ui.events.EventsActivity
 
 class LoginActivity : AppCompatActivity() {
 
@@ -18,7 +20,7 @@ class LoginActivity : AppCompatActivity() {
     private lateinit var btnLogin: Button
     private lateinit var btnBack: Button
 
-    private val auth = FirebaseAuth.getInstance()
+    private val authRepository = AuthRepository()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -59,7 +61,7 @@ class LoginActivity : AppCompatActivity() {
             return
         }
 
-        auth.sendPasswordResetEmail(email)
+        authRepository.sendPasswordReset(email)
             .addOnSuccessListener {
                 Toast.makeText(this, R.string.reset_email_sent, Toast.LENGTH_LONG).show()
             }
@@ -80,7 +82,7 @@ class LoginActivity : AppCompatActivity() {
 
         btnLogin.isEnabled = false
 
-        auth.signInWithEmailAndPassword(email, password)
+        authRepository.login(email, password)
             .addOnSuccessListener {
                 openEvents()
             }
