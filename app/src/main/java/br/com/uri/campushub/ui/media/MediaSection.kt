@@ -1,5 +1,6 @@
 package br.com.uri.campushub.ui.media
 
+import android.Manifest
 import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.net.Uri
@@ -11,6 +12,8 @@ import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.LifecycleOwner
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import br.com.uri.campushub.R
@@ -22,7 +25,7 @@ import java.io.File
 
 // cartão "Publicações" dos detalhes: lista, publica e exclui fotos, áudios e vídeos
 // fica fora da EventDetailsActivity para a tela não crescer ainda mais
-// precisa ser criada no onCreate da tela, porque registra os retornos da câmera e da galeria
+// precisa ser criada no onCreate da tela, porque registra os retornos da câmera, da galeria e da permissão
 class MediaSection(
     private val activity: AppCompatActivity,
     private val eventId: String,
@@ -43,6 +46,12 @@ class MediaSection(
     private val btnPublishMedia: MaterialButton = activity.findViewById(R.id.btnPublishMedia)
     private val txtNoMedia: TextView = activity.findViewById(R.id.txtNoMedia)
     private val rvMedia: RecyclerView = activity.findViewById(R.id.rvMedia)
+
+    private val player = AudioPlayer()
+    private val recordDialog = RecordAudioDialog(activity, storage) { fileName, durationMs ->
+        publish(MediaPost.TYPE_AUDIO, fileName, durationMs)
+    }
+    private var adapter: MediaAdapter? = null
 
     // arquivo que a câmera está preenchendo; fica guardado caso a tela seja recriada nesse meio-tempo
     private var pendingFile: File? = null
@@ -65,9 +74,33 @@ class MediaSection(
             if (uri != null) importAndPublish(uri, MediaPost.TYPE_PHOTO, "jpg")
         }
 
+    // o microfone é pedido só quando o aluno escolhe gravar
+    private val requestMic =
+        activity.registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            if (granted) {
+                recordDialog.show()
+            } else {
+                Toast.makeText(activity, R.string.mic_permission_denied, Toast.LENGTH_LONG).show()
+            }
+        }
+
     init {
         rvMedia.layoutManager = LinearLayoutManager(activity)
         btnPublishMedia.setOnClickListener { showPublishOptions() }
+        player.onChanged = { postId -> adapter?.notifyAudioChanged(postId) }
+
+        activity.lifecycle.addObserver(object : DefaultLifecycleObserver {
+            // tela escondida: o áudio pausa e a gravação é descartada
+            // (o Android não deixa usar o microfone com o app em segundo plano)
+            override fun onStop(owner: LifecycleOwner) {
+                player.pause()
+                recordDialog.cancel()
+            }
+
+            override fun onDestroy(owner: LifecycleOwner) {
+                player.stop()
+            }
+        })
     }
 
     fun saveState(outState: Bundle) {
@@ -82,13 +115,19 @@ class MediaSection(
     fun load() {
         repository.getAll(eventId)
             .addOnSuccessListener { posts ->
-                rvMedia.adapter = MediaAdapter(
+                // a lista nova perderia o estado do áudio que está tocando
+                player.stop()
+                val newAdapter = MediaAdapter(
                     posts,
                     uid,
                     findFile = { post -> storage.find(post.fileName) },
                     onOpen = { post, file -> open(post, file) },
-                    onDelete = { post -> confirmDelete(post) }
+                    onDelete = { post -> confirmDelete(post) },
+                    player = player,
+                    onToggleAudio = { post, file -> toggleAudio(post, file) }
                 )
+                adapter = newAdapter
+                rvMedia.adapter = newAdapter
                 txtMediaTitle.text = activity.getString(R.string.media_count, posts.size)
                 txtNoMedia.visibility = if (posts.isEmpty()) View.VISIBLE else View.GONE
             }
@@ -98,7 +137,8 @@ class MediaSection(
     private fun showPublishOptions() {
         val options = arrayOf(
             activity.getString(R.string.take_photo),
-            activity.getString(R.string.pick_photo)
+            activity.getString(R.string.pick_photo),
+            activity.getString(R.string.record_audio)
         )
         AlertDialog.Builder(activity)
             .setTitle(R.string.publish_media_title)
@@ -106,6 +146,7 @@ class MediaSection(
                 when (which) {
                     0 -> takePhoto()
                     1 -> pickPhoto.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                    2 -> requestMic.launch(Manifest.permission.RECORD_AUDIO)
                 }
             }
             .show()
@@ -156,6 +197,14 @@ class MediaSection(
         btnPublishMedia.isEnabled = !publishing
     }
 
+    private fun toggleAudio(post: MediaPost, file: File) {
+        try {
+            player.toggle(post.id, file)
+        } catch (_: Exception) {
+            Toast.makeText(activity, R.string.audio_unplayable, Toast.LENGTH_SHORT).show()
+        }
+    }
+
     private fun open(post: MediaPost, file: File) {
         val intent = Intent(activity, MediaViewerActivity::class.java)
         intent.putExtra(MediaViewerActivity.EXTRA_FILE_PATH, file.absolutePath)
@@ -174,6 +223,7 @@ class MediaSection(
 
     // apaga a publicação no Firestore e o arquivo, se ele estiver neste aparelho
     private fun delete(post: MediaPost) {
+        player.stopIfPlaying(post.id)
         repository.delete(eventId, post.id)
             .addOnSuccessListener {
                 storage.delete(post.fileName)

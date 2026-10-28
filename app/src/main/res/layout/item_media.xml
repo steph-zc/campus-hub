@@ -69,6 +69,50 @@
         android:visibility="gone"
         app:shapeAppearance="@style/ShapeAppearance.CampusHub.Media" />
 
+    <!-- áudio: tocar/pausar, barra de progresso e tempo -->
+    <LinearLayout
+        android:id="@+id/layoutAudio"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:background="@drawable/bg_media_placeholder"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingVertical="8dp"
+        android:paddingStart="8dp"
+        android:paddingEnd="16dp"
+        android:visibility="gone">
+
+        <!-- botão redondo só com o ícone -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnPlayAudio"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:insetTop="0dp"
+            android:insetBottom="0dp"
+            android:minWidth="0dp"
+            android:padding="0dp"
+            app:cornerRadius="24dp"
+            app:icon="@drawable/ic_play"
+            app:iconGravity="textStart"
+            app:iconPadding="0dp" />
+
+        <com.google.android.material.progressindicator.LinearProgressIndicator
+            android:id="@+id/progressAudio"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="12dp"
+            android:layout_weight="1" />
+
+        <TextView
+            android:id="@+id/txtAudioTime"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:fontFeatureSettings="tnum"
+            android:textSize="12sp" />
+
+    </LinearLayout>
+
     <!-- a publicação existe, mas o arquivo ficou no aparelho de quem publicou -->
     <TextView
         android:id="@+id/txtUnavailable"
