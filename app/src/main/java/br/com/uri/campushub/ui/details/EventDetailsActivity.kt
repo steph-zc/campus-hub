@@ -29,6 +29,7 @@ import br.com.uri.campushub.domain.RatingRules
 import br.com.uri.campushub.ui.common.applySystemBarsPadding
 import br.com.uri.campushub.ui.common.setupToolbar
 import br.com.uri.campushub.ui.events.EventChips
+import br.com.uri.campushub.ui.media.MediaSection
 import com.google.android.gms.tasks.Tasks
 import com.google.android.material.appbar.AppBarLayout
 import com.google.android.material.appbar.MaterialToolbar
@@ -86,6 +87,7 @@ class EventDetailsActivity : AppCompatActivity() {
 
     private lateinit var eventId: String
     private lateinit var uid: String
+    private lateinit var mediaSection: MediaSection
 
     // null enquanto os dados não chegaram; o coração só aparece depois
     private var isFavorite: Boolean? = null
@@ -136,6 +138,9 @@ class EventDetailsActivity : AppCompatActivity() {
         eventId = intent.getStringExtra(EXTRA_EVENT_ID)!!
         uid = authRepository.requireUserId()
 
+        mediaSection = MediaSection(this, eventId, uid)
+        mediaSection.restoreState(savedInstanceState)
+
         btnEnroll.setOnClickListener { enroll() }
         btnCancelEnrollment.setOnClickListener { confirmCancel() }
         layoutComment.setEndIconOnClickListener { postComment() }
@@ -147,6 +152,12 @@ class EventDetailsActivity : AppCompatActivity() {
 
         loadData()
         loadComments()
+        mediaSection.load()
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        mediaSection.saveState(outState)
     }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
@@ -216,6 +227,7 @@ class EventDetailsActivity : AppCompatActivity() {
                 val user = userTask.result
                 val userCourse = user?.course ?: ""
                 userName = user?.name ?: ""
+                mediaSection.userName = userName
                 val isEnrolled = enrolledTask.result
                 isFavorite = favoriteTask.result
                 // 0 = ainda não avaliou
