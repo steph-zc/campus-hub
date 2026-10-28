@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- pastas que o FileProvider pode compartilhar: só a das publicações (files/media) -->
+<paths>
+    <files-path
+        name="media"
+        path="media/" />
+</paths>

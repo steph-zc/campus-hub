@@ -29,6 +29,7 @@ import br.com.uri.campushub.domain.RatingRules
 import br.com.uri.campushub.ui.common.applySystemBarsPadding
 import br.com.uri.campushub.ui.common.setupToolbar
 import br.com.uri.campushub.ui.events.EventChips
+import br.com.uri.campushub.ui.media.MediaSection
 import com.google.android.gms.tasks.Tasks
 import com.google.android.material.appbar.AppBarLayout
 import com.google.android.material.appbar.MaterialToolbar
@@ -38,6 +39,7 @@ import com.google.android.material.chip.Chip
 import com.google.android.material.textfield.TextInputEditText
 import com.google.android.material.textfield.TextInputLayout
 import java.util.Locale
+import org.osmdroid.views.MapView
 
 class EventDetailsActivity : AppCompatActivity() {
 
@@ -65,6 +67,10 @@ class EventDetailsActivity : AppCompatActivity() {
     private lateinit var ratingBar: RatingBar
     private lateinit var txtRatingHint: TextView
     private lateinit var txtDescription: TextView
+    private lateinit var cardLocation: MaterialCardView
+    private lateinit var txtAddress: TextView
+    private lateinit var mapView: MapView
+    private lateinit var btnOpenMap: MaterialButton
     private lateinit var txtCommentsTitle: TextView
     private lateinit var layoutComment: TextInputLayout
     private lateinit var edtComment: TextInputEditText
@@ -81,6 +87,7 @@ class EventDetailsActivity : AppCompatActivity() {
 
     private lateinit var eventId: String
     private lateinit var uid: String
+    private lateinit var mediaSection: MediaSection
 
     // null enquanto os dados não chegaram; o coração só aparece depois
     private var isFavorite: Boolean? = null
@@ -90,6 +97,7 @@ class EventDetailsActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        EventMap.init(this)
         setContentView(R.layout.activity_event_details)
 
         appBar = findViewById(R.id.appBar)
@@ -112,6 +120,10 @@ class EventDetailsActivity : AppCompatActivity() {
         ratingBar = findViewById(R.id.ratingBar)
         txtRatingHint = findViewById(R.id.txtRatingHint)
         txtDescription = findViewById(R.id.txtDescription)
+        cardLocation = findViewById(R.id.cardLocation)
+        txtAddress = findViewById(R.id.txtAddress)
+        mapView = findViewById(R.id.mapView)
+        btnOpenMap = findViewById(R.id.btnOpenMap)
         txtCommentsTitle = findViewById(R.id.txtCommentsTitle)
         layoutComment = findViewById(R.id.layoutComment)
         edtComment = findViewById(R.id.edtComment)
@@ -126,6 +138,9 @@ class EventDetailsActivity : AppCompatActivity() {
         eventId = intent.getStringExtra(EXTRA_EVENT_ID)!!
         uid = authRepository.requireUserId()
 
+        mediaSection = MediaSection(this, eventId, uid)
+        mediaSection.restoreState(savedInstanceState)
+
         btnEnroll.setOnClickListener { enroll() }
         btnCancelEnrollment.setOnClickListener { confirmCancel() }
         layoutComment.setEndIconOnClickListener { postComment() }
@@ -137,6 +152,12 @@ class EventDetailsActivity : AppCompatActivity() {
 
         loadData()
         loadComments()
+        mediaSection.load()
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        mediaSection.saveState(outState)
     }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
@@ -206,6 +227,7 @@ class EventDetailsActivity : AppCompatActivity() {
                 val user = userTask.result
                 val userCourse = user?.course ?: ""
                 userName = user?.name ?: ""
+                mediaSection.userName = userName
                 val isEnrolled = enrolledTask.result
                 isFavorite = favoriteTask.result
                 // 0 = ainda não avaliou
@@ -231,11 +253,34 @@ class EventDetailsActivity : AppCompatActivity() {
         txtLocation.text = event.location
         txtCapacity.text = getString(R.string.spots_of_capacity, event.remainingSpots(), event.capacity)
         txtDescription.text = event.description
+        showLocation(event)
 
         showEnrollmentState(event, userCourse, isEnrolled)
 
         progressBar.visibility = View.GONE
         scrollContent.visibility = View.VISIBLE
+    }
+
+    private fun showLocation(event: Event) {
+        if (event.coordinates == null) {
+            cardLocation.visibility = View.GONE
+            return
+        }
+        cardLocation.visibility = View.VISIBLE
+        txtAddress.text = event.address
+        EventMap.show(mapView, event)
+        btnOpenMap.setOnClickListener { EventMap.openExternal(this, event) }
+    }
+
+    // o mapa baixa e desenha os pedaços só enquanto a tela está visível
+    override fun onResume() {
+        super.onResume()
+        mapView.onResume()
+    }
+
+    override fun onPause() {
+        super.onPause()
+        mapView.onPause()
     }
 
     private fun showRatingState(event: Event, isEnrolled: Boolean, myRating: Int) {

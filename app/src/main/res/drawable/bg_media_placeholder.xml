@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- fundo do aviso de arquivo indisponível; screen_background muda no modo escuro -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="@color/screen_background" />
+    <corners android:radius="8dp" />
+</shape>

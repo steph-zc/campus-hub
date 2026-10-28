@@ -39,4 +39,8 @@ class EventRepository(private val db: FirebaseFirestore = FirebaseFirestore.getI
 
     // grava os eventos de exemplo; a tela chama quando a coleção está vazia
     fun saveSampleEvents(): Task<Void> = SampleEvents.save(db)
+
+    // eventos de exemplo já gravados recebem o local atual (sala, endereço e ponto do prédio)
+    fun syncLocations(events: List<Event>): Task<Void> =
+        SampleEvents.syncLocations(db, events)
 }

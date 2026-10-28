@@ -2,12 +2,31 @@ package br.com.uri.campushub.data
 
 import br.com.uri.campushub.data.model.Event
 import com.google.android.gms.tasks.Task
+import com.google.android.gms.tasks.Tasks
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.GeoPoint
 import java.util.Calendar
 
 // eventos de exemplo gravados quando a coleção "events" ainda está vazia
 object SampleEvents {
+
+    // quase todos os eventos acontecem no campus da URI Santiago
+    private const val CAMPUS_ADDRESS = "Rua Batista Bonoto Sobrinho, 733 - São Vicente, Santiago - RS"
+
+    // o júri simulado acontece no fórum da cidade, no fim da mesma avenida do campus
+    private const val FORUM_ADDRESS = "Fórum de Santiago - Av. Batista Bonoto Sobrinho, Santiago - RS"
+    private val FORUM = GeoPoint(-29.1904969, -54.8802574)
+
+    // prédios do campus: cada evento fica no prédio do seu curso, e os de auditório no Prédio 4
+    // o OpenStreetMap não tem os prédios desenhados, então os pontos foram tirados
+    // do Google Maps, usando a rotatória da entrada como referência
+    private val PREDIO_1 = GeoPoint(-29.1935997, -54.8863212) // Direito
+    private val PREDIO_2 = GeoPoint(-29.1939712, -54.8862241) // Agronomia
+    private val PREDIO_3 = GeoPoint(-29.1941529, -54.8863259) // Administração, Arquitetura e Engenharia Civil
+    private val PREDIO_4 = GeoPoint(-29.1940761, -54.8869966) // auditórios do campus
+    private val PREDIO_COMPUTACAO = GeoPoint(-29.1944073, -54.8864877)
+    private val PREDIO_SAUDE = GeoPoint(-29.1954531, -54.8851463) // prédio da rádio
 
     private val events = listOf(
         // eventos que já aconteceram, para testar avaliações e o filtro de encerrados
@@ -20,18 +39,22 @@ object SampleEvents {
             capacity = 80,
             course = "Ciência da Computação",
             openToAll = true,
-            category = "Palestra"
+            category = "Palestra",
+            address = CAMPUS_ADDRESS,
+            coordinates = PREDIO_4
         ),
         Event(
             title = "Workshop de Oratória Jurídica",
             description = "Técnicas de argumentação e postura para sustentações orais. " +
                 "Exclusivo para alunos de Direito.",
-            location = "Sala 101, Prédio 2",
+            location = "Sala 101, Prédio 1",
             date = date(2026, Calendar.SEPTEMBER, 24, 14, 0),
             capacity = 35,
             course = "Direito",
             openToAll = false,
-            category = "Workshop"
+            category = "Workshop",
+            address = CAMPUS_ADDRESS,
+            coordinates = PREDIO_1
         ),
         Event(
             title = "Dia de Campo: Manejo do Solo",
@@ -42,7 +65,9 @@ object SampleEvents {
             capacity = 50,
             course = "Agronomia",
             openToAll = true,
-            category = "Visita técnica"
+            category = "Visita técnica",
+            address = CAMPUS_ADDRESS,
+            coordinates = PREDIO_2
         ),
         Event(
             title = "Seminário de Gestão e Empreendedorismo",
@@ -53,7 +78,9 @@ object SampleEvents {
             capacity = 150,
             course = "Administração",
             openToAll = true,
-            category = "Seminário"
+            category = "Seminário",
+            address = CAMPUS_ADDRESS,
+            coordinates = PREDIO_4
         ),
 
         // próximos eventos
@@ -66,18 +93,22 @@ object SampleEvents {
             capacity = 120,
             course = "Ciência da Computação",
             openToAll = false,
-            category = "Semana acadêmica"
+            category = "Semana acadêmica",
+            address = CAMPUS_ADDRESS,
+            coordinates = PREDIO_4
         ),
         Event(
             title = "Palestra: Inteligência Artificial no Agronegócio",
             description = "Como drones, sensores e IA estão mudando o campo. Com a participação " +
                 "de produtores da região.",
-            location = "Sala 205, Prédio 3",
+            location = "Sala 205, Prédio 2",
             date = date(2026, Calendar.OCTOBER, 22, 14, 0),
             capacity = 60,
             course = "Agronomia",
             openToAll = true,
-            category = "Palestra"
+            category = "Palestra",
+            address = CAMPUS_ADDRESS,
+            coordinates = PREDIO_2
         ),
         Event(
             title = "Workshop de Primeiros Socorros",
@@ -88,17 +119,21 @@ object SampleEvents {
             capacity = 30,
             course = "Medicina",
             openToAll = false,
-            category = "Workshop"
+            category = "Workshop",
+            address = CAMPUS_ADDRESS,
+            coordinates = PREDIO_SAUDE
         ),
         Event(
             title = "Júri Simulado",
             description = "Os alunos de Direito encenam um julgamento completo. Aberto ao público.",
-            location = "Auditório do Direito",
+            location = "Fórum de Santiago",
             date = date(2026, Calendar.OCTOBER, 29, 19, 30),
             capacity = 80,
             course = "Direito",
             openToAll = true,
-            category = "Workshop"
+            category = "Workshop",
+            address = FORUM_ADDRESS,
+            coordinates = FORUM
         ),
         Event(
             title = "Feira de Profissões",
@@ -109,18 +144,22 @@ object SampleEvents {
             capacity = 300,
             course = "Administração",
             openToAll = true,
-            category = "Feira"
+            category = "Feira",
+            address = CAMPUS_ADDRESS,
+            coordinates = PREDIO_3
         ),
         Event(
             title = "Visita Técnica a Obra",
             description = "Visita guiada a uma obra de edifício residencial no centro da cidade. " +
                 "Exclusiva para alunos de Engenharia Civil, com uso obrigatório de EPI.",
-            location = "Saída em frente ao Prédio 5",
+            location = "Saída em frente ao Prédio 3",
             date = date(2026, Calendar.NOVEMBER, 11, 13, 30),
             capacity = 25,
             course = "Engenharia Civil",
             openToAll = false,
-            category = "Visita técnica"
+            category = "Visita técnica",
+            address = CAMPUS_ADDRESS,
+            coordinates = PREDIO_3
         ),
         Event(
             title = "Hackathon CampusHub",
@@ -131,7 +170,9 @@ object SampleEvents {
             capacity = 40,
             course = "Ciência da Computação",
             openToAll = false,
-            category = "Competição"
+            category = "Competição",
+            address = CAMPUS_ADDRESS,
+            coordinates = PREDIO_COMPUTACAO
         ),
         Event(
             title = "Seminário de Arquitetura Sustentável",
@@ -142,7 +183,9 @@ object SampleEvents {
             capacity = 100,
             course = "Arquitetura",
             openToAll = true,
-            category = "Seminário"
+            category = "Seminário",
+            address = CAMPUS_ADDRESS,
+            coordinates = PREDIO_4
         )
     )
 
@@ -152,6 +195,30 @@ object SampleEvents {
         for (event in events) {
             batch.set(db.collection("events").document(), event)
         }
+        return batch.commit()
+    }
+
+    // eventos já gravados ficam com o local do exemplo de mesmo título
+    // (antes não tinham endereço; depois o ponto passou do campus para o prédio de cada curso)
+    fun syncLocations(db: FirebaseFirestore, saved: List<Event>): Task<Void> {
+        val batch = db.batch()
+        var count = 0
+        for (event in saved) {
+            val sample = events.find { it.title == event.title } ?: continue
+            if (event.location == sample.location && event.address == sample.address &&
+                event.coordinates == sample.coordinates
+            ) continue
+            batch.update(
+                db.collection("events").document(event.id),
+                mapOf(
+                    "location" to sample.location,
+                    "address" to sample.address,
+                    "coordinates" to sample.coordinates
+                )
+            )
+            count++
+        }
+        if (count == 0) return Tasks.forResult(null)
         return batch.commit()
     }
 

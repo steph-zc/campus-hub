@@ -50,4 +50,10 @@
         <item name="chipMinHeight">32dp</item>
         <item name="ensureMinTouchTargetSize">false</item>
     </style>
+
+    <!-- cantos arredondados das fotos e vídeos publicados -->
+    <style name="ShapeAppearance.CampusHub.Media" parent="">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">8dp</item>
+    </style>
 </resources>

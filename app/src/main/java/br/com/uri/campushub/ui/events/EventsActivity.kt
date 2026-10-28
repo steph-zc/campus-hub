@@ -120,6 +120,9 @@ class EventsActivity : AppCompatActivity() {
                     return@addOnSuccessListener
                 }
 
+                // não precisa esperar: os detalhes já leem o local novo, e a lista na próxima carga
+                eventRepository.syncLocations(events)
+
                 allEvents = EventFilter.sortForList(events)
                 progressBar.visibility = View.GONE
                 // reaplica a busca, caso o aluno tenha voltado de outra tela com texto digitado

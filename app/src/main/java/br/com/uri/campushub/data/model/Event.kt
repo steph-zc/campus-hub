@@ -2,6 +2,7 @@ package br.com.uri.campushub.data.model
 
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.DocumentId
+import com.google.firebase.firestore.GeoPoint
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -21,7 +22,11 @@ data class Event(
     // quantos alunos já se inscreveram; muda a cada inscrição ou cancelamento
     val enrolledCount: Int = 0,
     // tipo do evento: Palestra, Workshop, Seminário...
-    val category: String = ""
+    val category: String = "",
+    // endereço da rua; "location" continua sendo o lugar dentro do campus (sala, auditório...)
+    val address: String = "",
+    // ponto do evento no mapa; null nos eventos ainda sem localização
+    val coordinates: GeoPoint? = null
 ) {
     fun remainingSpots() = (capacity - enrolledCount).coerceAtLeast(0)
 

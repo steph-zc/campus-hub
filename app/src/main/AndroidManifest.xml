@@ -2,6 +2,12 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <!-- o mapa baixa os pedaços do OpenStreetMap pela internet -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- gravar áudios nas publicações; pedida na hora de gravar -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
     <application
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
@@ -45,6 +51,21 @@
             android:name=".ui.profile.ProfileActivity"
             android:theme="@style/Theme.CampusHub.NoActionBar"
             android:windowSoftInputMode="adjustResize" />
+
+        <activity
+            android:name=".ui.media.MediaViewerActivity"
+            android:theme="@style/Theme.CampusHub.NoActionBar" />
+
+        <!-- entrega à câmera um endereço content:// para ela gravar a foto na pasta do app -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
 
     </application>
 
