@@ -40,7 +40,7 @@
     <string name="take_photo">Tirar foto</string>
     <string name="pick_photo">Escolher foto da galeria</string>
     <string name="no_camera_app">Nenhum app de câmera encontrado</string>
-    <string name="no_media">Nenhuma publicação ainda. Compartilhe uma foto ou um áudio do evento!</string>
+    <string name="no_media">Nenhuma publicação ainda. Compartilhe fotos, áudios ou vídeos do evento!</string>
     <string name="media_unavailable">O arquivo desta publicação está só no aparelho de quem publicou</string>
     <string name="media_options">Opções da publicação</string>
     <string name="media_published">Publicação enviada</string>
@@ -59,6 +59,11 @@
     <string name="audio_unplayable">Não foi possível tocar este áudio</string>
     <string name="play_audio">Tocar áudio de %1$s</string>
     <string name="pause_audio">Pausar áudio de %1$s</string>
+    <string name="record_video">Gravar vídeo</string>
+    <string name="pick_video">Escolher vídeo da galeria</string>
+    <string name="video_too_long">O vídeo pode ter até 30 segundos</string>
+    <string name="video_unreadable">Não foi possível abrir este vídeo</string>
+    <string name="video_by">Vídeo de %1$s, %2$s</string>
     <string name="event_not_found">Evento não encontrado</string>
     <string name="remaining_spots">%1$d vagas restantes</string>
     <string name="spots_of_capacity">%1$d de %2$d vagas disponíveis</string>

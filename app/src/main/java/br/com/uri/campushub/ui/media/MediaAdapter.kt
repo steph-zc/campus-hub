@@ -40,7 +40,10 @@ class MediaAdapter(
         val txtAuthor: TextView = view.findViewById(R.id.txtAuthor)
         val txtDate: TextView = view.findViewById(R.id.txtDate)
         val btnMediaMenu: ImageButton = view.findViewById(R.id.btnMediaMenu)
+        val layoutVisual: View = view.findViewById(R.id.layoutVisual)
         val imgPhoto: ImageView = view.findViewById(R.id.imgPhoto)
+        val imgVideoPlay: View = view.findViewById(R.id.imgVideoPlay)
+        val txtVideoDuration: TextView = view.findViewById(R.id.txtVideoDuration)
         val txtUnavailable: TextView = view.findViewById(R.id.txtUnavailable)
         val layoutAudio: View = view.findViewById(R.id.layoutAudio)
         val btnPlayAudio: MaterialButton = view.findViewById(R.id.btnPlayAudio)
@@ -68,7 +71,7 @@ class MediaAdapter(
         val file = findFile(post)
         val isAudio = post.type == MediaPost.TYPE_AUDIO
         holder.txtUnavailable.visibility = if (file == null) View.VISIBLE else View.GONE
-        holder.imgPhoto.visibility = if (file != null && !isAudio) View.VISIBLE else View.GONE
+        holder.layoutVisual.visibility = if (file != null && !isAudio) View.VISIBLE else View.GONE
         holder.layoutAudio.visibility = if (file != null && isAudio) View.VISIBLE else View.GONE
         if (file == null) return
 
@@ -77,9 +80,18 @@ class MediaAdapter(
             bindAudio(holder, post)
         } else {
             // o Glide reduz a foto para o tamanho da tela, gira conforme a câmera e guarda em cache
+            // no vídeo ele mostra o primeiro quadro
             Glide.with(holder.imgPhoto).load(file).into(holder.imgPhoto)
-            holder.imgPhoto.contentDescription = context.getString(R.string.photo_by, post.authorName)
             holder.imgPhoto.setOnClickListener { onOpen(post, file) }
+
+            val isVideo = post.type == MediaPost.TYPE_VIDEO
+            holder.imgVideoPlay.visibility = if (isVideo) View.VISIBLE else View.GONE
+            holder.txtVideoDuration.visibility = if (isVideo) View.VISIBLE else View.GONE
+            val duration = MediaRules.formatDuration(post.durationMs)
+            holder.txtVideoDuration.text = duration
+            holder.imgPhoto.contentDescription =
+                if (isVideo) context.getString(R.string.video_by, post.authorName, duration)
+                else context.getString(R.string.photo_by, post.authorName)
         }
     }
 

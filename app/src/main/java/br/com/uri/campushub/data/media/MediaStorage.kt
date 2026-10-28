@@ -1,6 +1,7 @@
 package br.com.uri.campushub.data.media
 
 import android.content.Context
+import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.webkit.MimeTypeMap
 import androidx.core.content.FileProvider
@@ -36,6 +37,20 @@ class MediaStorage(private val context: Context) {
 
     fun delete(fileName: String) {
         if (fileName.isNotEmpty()) File(dir, fileName).delete()
+    }
+
+    // duração de um áudio ou vídeo da pasta; 0 se o arquivo não é uma mídia válida
+    fun durationOf(fileName: String): Long {
+        val file = find(fileName) ?: return 0L
+        return try {
+            MediaMetadataRetriever().use { retriever ->
+                retriever.setDataSource(file.absolutePath)
+                retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
+                    ?.toLongOrNull() ?: 0L
+            }
+        } catch (_: Exception) {
+            0L
+        }
     }
 
     // endereço content:// que outro app (a câmera) pode usar para gravar no arquivo

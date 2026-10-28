@@ -58,16 +58,51 @@
 
     </LinearLayout>
 
-    <!-- foto; toque abre em tela cheia -->
-    <com.google.android.material.imageview.ShapeableImageView
-        android:id="@+id/imgPhoto"
+    <!-- foto ou primeiro quadro do vídeo; toque abre em tela cheia -->
+    <FrameLayout
+        android:id="@+id/layoutVisual"
         android:layout_width="match_parent"
         android:layout_height="220dp"
         android:layout_marginTop="8dp"
-        android:background="?attr/selectableItemBackground"
-        android:scaleType="centerCrop"
-        android:visibility="gone"
-        app:shapeAppearance="@style/ShapeAppearance.CampusHub.Media" />
+        android:visibility="gone">
+
+        <com.google.android.material.imageview.ShapeableImageView
+            android:id="@+id/imgPhoto"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@color/black"
+            android:foreground="?attr/selectableItemBackground"
+            android:scaleType="centerCrop"
+            app:shapeAppearance="@style/ShapeAppearance.CampusHub.Media" />
+
+        <!-- só nos vídeos: botão de play no meio e duração no canto -->
+        <ImageView
+            android:id="@+id/imgVideoPlay"
+            android:layout_width="56dp"
+            android:layout_height="56dp"
+            android:layout_gravity="center"
+            android:background="@drawable/bg_video_overlay_round"
+            android:importantForAccessibility="no"
+            android:padding="12dp"
+            android:src="@drawable/ic_play"
+            android:visibility="gone"
+            app:tint="@color/white" />
+
+        <TextView
+            android:id="@+id/txtVideoDuration"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom|end"
+            android:layout_margin="8dp"
+            android:background="@drawable/bg_video_overlay"
+            android:fontFeatureSettings="tnum"
+            android:paddingHorizontal="6dp"
+            android:paddingVertical="2dp"
+            android:textColor="@color/white"
+            android:textSize="12sp"
+            android:visibility="gone" />
+
+    </FrameLayout>
 
     <!-- áudio: tocar/pausar, barra de progresso e tempo -->
     <LinearLayout

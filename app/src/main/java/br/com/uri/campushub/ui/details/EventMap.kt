@@ -21,7 +21,8 @@ import java.io.File
 // trocar de biblioteca no futuro mexe só neste arquivo e no layout
 object EventMap {
 
-    private const val ZOOM = 17.0
+    // perto o bastante para distinguir os prédios, que ficam a 20-30 m um do outro
+    private const val ZOOM = 18.0
 
     // precisa rodar antes do setContentView, que cria o MapView
     fun init(context: Context) {

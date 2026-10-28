@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- foto em tela cheia, sobre fundo preto nos dois temas -->
+<!-- foto ou vídeo em tela cheia, sobre fundo preto nos dois temas -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/root"
@@ -13,6 +13,15 @@
         android:layout_height="match_parent"
         android:contentDescription="@string/media_full_screen"
         android:scaleType="fitCenter" />
+
+    <!-- só nos vídeos; ocupa o máximo da tela sem distorcer, e os controles aparecem ao tocar -->
+    <VideoView
+        android:id="@+id/videoFull"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_gravity="center"
+        android:contentDescription="@string/media_full_screen"
+        android:visibility="gone" />
 
     <com.google.android.material.appbar.MaterialToolbar
         android:id="@+id/toolbar"

@@ -8,6 +8,7 @@ import android.os.Bundle
 import android.view.View
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
@@ -20,6 +21,7 @@ import br.com.uri.campushub.R
 import br.com.uri.campushub.data.media.MediaStorage
 import br.com.uri.campushub.data.model.MediaPost
 import br.com.uri.campushub.data.repository.MediaRepository
+import br.com.uri.campushub.domain.MediaRules
 import com.google.android.material.button.MaterialButton
 import java.io.File
 
@@ -58,8 +60,7 @@ class MediaSection(
 
     private val takePicture =
         activity.registerForActivityResult(ActivityResultContracts.TakePicture()) { saved ->
-            val file = pendingFile ?: return@registerForActivityResult
-            pendingFile = null
+            val file = takePendingFile() ?: return@registerForActivityResult
             if (saved) {
                 publish(MediaPost.TYPE_PHOTO, file.name)
             } else {
@@ -68,10 +69,26 @@ class MediaSection(
             }
         }
 
-    // seletor de fotos do Android: não precisa de permissão para ler a galeria
+    private val takeVideo =
+        activity.registerForActivityResult(CaptureShortVideo()) { saved ->
+            val file = takePendingFile() ?: return@registerForActivityResult
+            if (saved) {
+                publishVideo(file.name)
+            } else {
+                // a câmera grava direto no arquivo; se o aluno descartou, o arquivo pode estar cheio
+                file.delete()
+            }
+        }
+
+    // seletor do Android: não precisa de permissão para ler a galeria
     private val pickPhoto =
         activity.registerForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
             if (uri != null) importAndPublish(uri, MediaPost.TYPE_PHOTO, "jpg")
+        }
+
+    private val pickVideo =
+        activity.registerForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+            if (uri != null) importAndPublish(uri, MediaPost.TYPE_VIDEO, "mp4")
         }
 
     // o microfone é pedido só quando o aluno escolhe gravar
@@ -138,26 +155,30 @@ class MediaSection(
         val options = arrayOf(
             activity.getString(R.string.take_photo),
             activity.getString(R.string.pick_photo),
-            activity.getString(R.string.record_audio)
+            activity.getString(R.string.record_audio),
+            activity.getString(R.string.record_video),
+            activity.getString(R.string.pick_video)
         )
         AlertDialog.Builder(activity)
             .setTitle(R.string.publish_media_title)
             .setItems(options) { _, which ->
                 when (which) {
-                    0 -> takePhoto()
+                    0 -> launchCamera(takePicture, "jpg")
                     1 -> pickPhoto.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                     2 -> requestMic.launch(Manifest.permission.RECORD_AUDIO)
+                    3 -> launchCamera(takeVideo, "mp4")
+                    4 -> pickVideo.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.VideoOnly))
                 }
             }
             .show()
     }
 
-    // o app de câmera grava direto no arquivo do app, pelo endereço do FileProvider
-    private fun takePhoto() {
-        val file = storage.newFile("jpg")
+    // o app de câmera grava a foto ou o vídeo direto no arquivo do app, pelo endereço do FileProvider
+    private fun launchCamera(launcher: ActivityResultLauncher<Uri>, extension: String) {
+        val file = storage.newFile(extension)
         pendingFile = file
         try {
-            takePicture.launch(storage.shareableUri(file))
+            launcher.launch(storage.shareableUri(file))
         } catch (_: ActivityNotFoundException) {
             pendingFile = null
             file.delete()
@@ -165,15 +186,41 @@ class MediaSection(
         }
     }
 
+    // devolve o arquivo que a câmera preencheu e esquece dele
+    private fun takePendingFile(): File? {
+        val file = pendingFile
+        pendingFile = null
+        return file
+    }
+
     // a galeria devolve um endereço de outro app; o arquivo é copiado para a pasta do app antes
     private fun importAndPublish(uri: Uri, type: String, defaultExtension: String) {
         setPublishing(true)
         storage.importFrom(uri, defaultExtension)
-            .addOnSuccessListener { fileName -> publish(type, fileName) }
+            .addOnSuccessListener { fileName ->
+                if (type == MediaPost.TYPE_VIDEO) publishVideo(fileName) else publish(type, fileName)
+            }
             .addOnFailureListener { error ->
                 setPublishing(false)
                 showError(error)
             }
+    }
+
+    // só vídeo curto: o da galeria pode ter qualquer tamanho, e nem toda câmera respeita o limite
+    private fun publishVideo(fileName: String) {
+        val duration = storage.durationOf(fileName)
+        val error = when {
+            duration <= 0 -> R.string.video_unreadable
+            !MediaRules.isVideoShortEnough(duration) -> R.string.video_too_long
+            else -> null
+        }
+        if (error != null) {
+            storage.delete(fileName)
+            setPublishing(false)
+            Toast.makeText(activity, error, Toast.LENGTH_LONG).show()
+            return
+        }
+        publish(MediaPost.TYPE_VIDEO, fileName, duration.coerceAtMost(MediaRules.MAX_VIDEO_MS))
     }
 
     private fun publish(type: String, fileName: String, durationMs: Long = 0) {
@@ -208,6 +255,7 @@ class MediaSection(
     private fun open(post: MediaPost, file: File) {
         val intent = Intent(activity, MediaViewerActivity::class.java)
         intent.putExtra(MediaViewerActivity.EXTRA_FILE_PATH, file.absolutePath)
+        intent.putExtra(MediaViewerActivity.EXTRA_IS_VIDEO, post.type == MediaPost.TYPE_VIDEO)
         intent.putExtra(MediaViewerActivity.EXTRA_AUTHOR, post.authorName)
         intent.putExtra(MediaViewerActivity.EXTRA_DATE, post.formattedDate())
         activity.startActivity(intent)

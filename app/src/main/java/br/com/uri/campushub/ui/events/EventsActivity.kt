@@ -120,8 +120,8 @@ class EventsActivity : AppCompatActivity() {
                     return@addOnSuccessListener
                 }
 
-                // a lista não mostra o endereço, então não precisa esperar; os detalhes já leem o novo
-                eventRepository.addMissingLocations(events)
+                // não precisa esperar: os detalhes já leem o local novo, e a lista na próxima carga
+                eventRepository.syncLocations(events)
 
                 allEvents = EventFilter.sortForList(events)
                 progressBar.visibility = View.GONE
