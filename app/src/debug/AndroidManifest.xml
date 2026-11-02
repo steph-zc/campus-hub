@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- só no build de debug (o usado pelos testes): soma ao manifest principal a liberação de
+     conexão sem criptografia com o Firebase Local Emulator Suite -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application android:networkSecurityConfig="@xml/network_security_config" />
+
+</manifest>

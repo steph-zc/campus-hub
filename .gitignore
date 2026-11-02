@@ -227,3 +227,8 @@ gradle-app.setting
 
 ### Kotlin Gradle Plugin ###
 .kotlin/
+
+### Firebase Local Emulator Suite ###
+# cache da CLI e logs dos emuladores (firebase-debug.log, firestore-debug.log, ui-debug.log)
+.firebase/
+*-debug.log

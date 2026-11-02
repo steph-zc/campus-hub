@@ -76,6 +76,8 @@ dependencies {
     testImplementation(libs.mockk)
     testImplementation(libs.robolectric)
     testImplementation(libs.androidx.test.core)
-    androidTestImplementation(libs.androidx.espresso.core)
+    // testes no aparelho (integração com o Firebase Emulator e ponta a ponta): AndroidX Test e Espresso
+    androidTestImplementation(libs.androidx.test.runner)
     androidTestImplementation(libs.androidx.junit)
+    androidTestImplementation(libs.androidx.espresso.core)
 }
