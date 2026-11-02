@@ -54,15 +54,34 @@ object FirebaseEmulator {
     fun clearData() {
         connect()
         FirebaseAuth.getInstance().signOut()
-        val projectId = FirebaseApp.getInstance().options.projectId
-        delete("http://$host:$FIRESTORE_PORT/emulator/v1/projects/$projectId/databases/(default)/documents")
-        delete("http://$host:$AUTH_PORT/emulator/v1/projects/$projectId/accounts")
+        send("DELETE", "http://$host:$FIRESTORE_PORT/emulator/v1/projects/$projectId/databases/(default)/documents")
+        send("DELETE", "http://$host:$AUTH_PORT/emulator/v1/projects/$projectId/accounts")
     }
 
-    private fun delete(address: String) {
+    // cria admins/{uid}, o que dá à conta a permissão de admin do firestore.rules.
+    // O app não consegue gravar nessa coleção; aqui a API REST do emulador recebe o token
+    // "owner", que ignora as regras, como o console do Firebase faz no projeto real
+    fun makeAdmin(uid: String) {
+        send(
+            "POST",
+            "http://$host:$FIRESTORE_PORT/v1/projects/$projectId/databases/(default)/documents/admins?documentId=$uid",
+            body = "{\"fields\": {}}"
+        )
+    }
+
+    private val projectId: String
+        get() = FirebaseApp.getInstance().options.projectId!!
+
+    private fun send(method: String, address: String, body: String? = null) {
         val connection = URL(address).openConnection() as HttpURLConnection
         try {
-            connection.requestMethod = "DELETE"
+            connection.requestMethod = method
+            connection.setRequestProperty("Authorization", "Bearer owner")
+            if (body != null) {
+                connection.doOutput = true
+                connection.setRequestProperty("Content-Type", "application/json")
+                connection.outputStream.use { it.write(body.toByteArray()) }
+            }
             val code = connection.responseCode
             check(code == HttpURLConnection.HTTP_OK) { "O emulador respondeu $code em $address" }
         } catch (error: ConnectException) {

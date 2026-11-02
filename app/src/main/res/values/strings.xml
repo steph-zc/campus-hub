@@ -97,6 +97,7 @@
     <string name="search_events">Buscar evento pelo título</string>
     <string name="no_results">Nenhum evento encontrado para \"%1$s\"</string>
     <string name="no_results_filters">Nenhum evento com esses filtros</string>
+    <string name="no_events">Nenhum evento cadastrado ainda</string>
     <string name="filter_upcoming">Próximos</string>
     <string name="filter_ended">Encerrados</string>
     <string name="filter_all">Todos</string>

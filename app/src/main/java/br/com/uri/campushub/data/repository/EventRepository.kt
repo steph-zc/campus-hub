@@ -6,10 +6,18 @@ import com.google.android.gms.tasks.Task
 import com.google.android.gms.tasks.Tasks
 import com.google.firebase.firestore.FieldPath
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.firestore.QuerySnapshot
 
-// leitura dos eventos na coleção "events"
+// leitura dos eventos na coleção "events" (a gravação é só da conta admin)
 class EventRepository(private val db: FirebaseFirestore = FirebaseFirestore.getInstance()) {
+
+    companion object {
+        // as regras do Firestore (firestore.rules) só deixam a conta admin gravar eventos;
+        // para os outros alunos a gravação dos exemplos volta com esse erro
+        fun isPermissionDenied(error: Exception) =
+            (error as? FirebaseFirestoreException)?.code == FirebaseFirestoreException.Code.PERMISSION_DENIED
+    }
 
     private val events = db.collection("events")
 
@@ -37,10 +45,11 @@ class EventRepository(private val db: FirebaseFirestore = FirebaseFirestore.getI
             }
     }
 
-    // grava os eventos de exemplo; a tela chama quando a coleção está vazia
+    // grava os eventos de exemplo; a tela chama quando a coleção está vazia (só a conta admin consegue)
     fun saveSampleEvents(): Task<Void> = SampleEvents.save(db)
 
-    // eventos de exemplo já gravados recebem o local atual (sala, endereço e ponto do prédio)
+    // eventos de exemplo já gravados recebem o local atual (sala, endereço e ponto do prédio);
+    // só grava se algo mudou, e só a conta admin tem permissão
     fun syncLocations(events: List<Event>): Task<Void> =
         SampleEvents.syncLocations(db, events)
 }

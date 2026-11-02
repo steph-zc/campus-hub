@@ -1,0 +1,215 @@
+rules_version = '2';
+
+// regras de segurança do Cloud Firestore do CampusHub
+// rodam no servidor do Firebase (e no emulador), então valem mesmo que alguém altere o app:
+// o uid vem do token do Firebase Authentication (request.auth), nunca de um dado enviado pelo cliente.
+// O que não estiver liberado aqui é negado.
+// Publicar no projeto real: firebase deploy --only firestore:rules
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---------- funções de apoio ----------
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    // o documento pertence ao aluno logado (o uid faz parte do caminho)
+    function isOwner(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    // admin = existe admins/{uid}; esse documento só é criado pelo console do Firebase
+    function isAdmin() {
+      return signedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
+    function data() {
+      return request.resource.data;
+    }
+
+    // o documento novo tem exatamente esses campos, nem mais nem menos
+    function hasExactly(fields) {
+      return data().keys().hasOnly(fields) && data().keys().hasAll(fields);
+    }
+
+    // a alteração mexe só nesses campos
+    function changesOnly(fields) {
+      return data().diff(resource.data).affectedKeys().hasOnly(fields);
+    }
+
+    function isText(value, maxSize) {
+      return value is string && value.size() > 0 && value.size() <= maxSize;
+    }
+
+    function eventPath(eventId) {
+      return /databases/$(database)/documents/events/$(eventId);
+    }
+
+    function enrollmentPath(uid, eventId) {
+      return /databases/$(database)/documents/users/$(uid)/enrollments/$(eventId);
+    }
+
+    // o evento ainda não aconteceu (o contrário do Event.hasEnded() no app)
+    function isUpcoming(eventId) {
+      return get(eventPath(eventId)).data.date > request.time;
+    }
+
+    // ---------- admins ----------
+
+    // nenhum cliente lê ou grava; o app só descobre que é admin quando a gravação é aceita
+    match /admins/{uid} {
+      allow read, write: if false;
+    }
+
+    // ---------- perfil: users/{uid} ----------
+
+    match /users/{uid} {
+      allow read: if isOwner(uid);
+
+      // cadastro: o email do perfil é o mesmo da conta do Authentication
+      allow create: if isOwner(uid)
+        && hasExactly(['name', 'course', 'email'])
+        && isText(data().name, 100)
+        && isText(data().course, 100)
+        && data().email is string
+        && data().email.lower() == request.auth.token.email.lower();
+
+      // editar perfil troca só nome e curso; o email fica como estava
+      allow update: if isOwner(uid)
+        && changesOnly(['name', 'course'])
+        && isText(data().name, 100)
+        && isText(data().course, 100);
+
+      allow delete: if false;
+
+      // ---------- favoritos: users/{uid}/favorites/{eventId} ----------
+
+      match /favorites/{eventId} {
+        allow read, delete: if isOwner(uid);
+
+        // create e update: o set() do app grava de novo o mesmo favorito
+        allow create, update: if isOwner(uid)
+          && hasExactly(['eventId', 'favoritedAt'])
+          && data().eventId == eventId
+          && data().favoritedAt == request.time;
+      }
+
+      // ---------- inscrições: users/{uid}/enrollments/{eventId} ----------
+
+      match /enrollments/{eventId} {
+        allow read: if isOwner(uid);
+
+        // inscrever: evento futuro, aberto ao curso do aluno e com o enrolledCount
+        // subindo 1 na mesma transação (getAfter = como o evento fica depois dela)
+        allow create: if isOwner(uid)
+          && hasExactly(['eventId', 'enrolledAt'])
+          && data().eventId == eventId
+          && data().enrolledAt == request.time
+          && isUpcoming(eventId)
+          && (get(eventPath(eventId)).data.openToAll
+              || get(eventPath(eventId)).data.course
+                   == get(/databases/$(database)/documents/users/$(uid)).data.course)
+          && getAfter(eventPath(eventId)).data.enrolledCount
+               == get(eventPath(eventId)).data.enrolledCount + 1;
+
+        // cancelar: só antes do evento, devolvendo a vaga na mesma transação
+        allow delete: if isOwner(uid)
+          && isUpcoming(eventId)
+          && getAfter(eventPath(eventId)).data.enrolledCount
+               == get(eventPath(eventId)).data.enrolledCount - 1;
+
+        allow update: if false;
+      }
+    }
+
+    // ---------- eventos: events/{eventId} ----------
+
+    // aluno comum só mexe no contador de inscritos, e só junto com a própria inscrição:
+    // +1 quando ela é criada (sem passar da capacidade), -1 quando ela é apagada
+    function isEnrollmentCount(eventId) {
+      let before = resource.data.enrolledCount;
+      let after = data().enrolledCount;
+      let enrollment = enrollmentPath(request.auth.uid, eventId);
+      return signedIn()
+        && changesOnly(['enrolledCount'])
+        && ((after == before + 1
+              && after <= resource.data.capacity
+              && !exists(enrollment)
+              && existsAfter(enrollment))
+            || (after == before - 1
+              && exists(enrollment)
+              && !existsAfter(enrollment)));
+    }
+
+    match /events/{eventId} {
+      allow read: if signedIn();
+
+      // eventos são criados e editados só pela conta admin (eventos de exemplo e locais)
+      allow create, delete: if isAdmin();
+      allow update: if isAdmin() || isEnrollmentCount(eventId);
+
+      // ---------- comentários: events/{eventId}/comments/{commentId} ----------
+
+      match /comments/{commentId} {
+        allow read: if signedIn();
+
+        // o autor gravado é sempre quem está logado; 500 é o limite do campo na tela
+        allow create: if signedIn()
+          && hasExactly(['userId', 'authorName', 'text', 'createdAt'])
+          && data().userId == request.auth.uid
+          && isText(data().authorName, 100)
+          && isText(data().text, 500)
+          && data().createdAt == request.time;
+
+        // só o autor edita (texto e data da edição) ou exclui
+        allow update: if signedIn()
+          && resource.data.userId == request.auth.uid
+          && changesOnly(['text', 'editedAt'])
+          && isText(data().text, 500)
+          && data().editedAt == request.time;
+
+        allow delete: if signedIn() && resource.data.userId == request.auth.uid;
+      }
+
+      // ---------- avaliações: events/{eventId}/ratings/{uid} ----------
+
+      match /ratings/{uid} {
+        // leitura liberada para a média e a quantidade (agregação) aparecerem para todos
+        allow read: if signedIn();
+
+        // mesma regra do RatingRules: inscrito, evento já aconteceu, nota de 1 a 5
+        allow create, update: if isOwner(uid)
+          && hasExactly(['userId', 'value', 'updatedAt'])
+          && data().userId == uid
+          && data().value is int
+          && data().value >= 1 && data().value <= 5
+          && data().updatedAt == request.time
+          && exists(enrollmentPath(uid, eventId))
+          && get(eventPath(eventId)).data.date < request.time;
+
+        allow delete: if false;
+      }
+
+      // ---------- fotos, áudios e vídeos: events/{eventId}/media/{postId} ----------
+
+      match /media/{postId} {
+        allow read: if signedIn();
+
+        allow create: if signedIn()
+          && hasExactly(['userId', 'authorName', 'type', 'fileName', 'durationMs', 'createdAt'])
+          && data().userId == request.auth.uid
+          && isText(data().authorName, 100)
+          && data().type in ['photo', 'audio', 'video']
+          && isText(data().fileName, 200)
+          && data().durationMs is int
+          && data().durationMs >= 0
+          && data().createdAt == request.time;
+
+        // publicação não é editada; só o autor exclui (MediaRules.canDelete)
+        allow update: if false;
+        allow delete: if signedIn() && resource.data.userId == request.auth.uid;
+      }
+    }
+  }
+}

@@ -116,7 +116,10 @@ class EventsActivity : AppCompatActivity() {
                     // primeira execução: cria os eventos de exemplo e busca de novo
                     eventRepository.saveSampleEvents()
                         .addOnSuccessListener { loadEvents() }
-                        .addOnFailureListener { error -> showError(error) }
+                        .addOnFailureListener { error ->
+                            // aluno sem permissão de admin: a lista fica vazia com um aviso
+                            if (EventRepository.isPermissionDenied(error)) showNoEvents() else showError(error)
+                        }
                     return@addOnSuccessListener
                 }
 
@@ -166,6 +169,12 @@ class EventsActivity : AppCompatActivity() {
         val intent = Intent(this, EventDetailsActivity::class.java)
         intent.putExtra(EventDetailsActivity.EXTRA_EVENT_ID, event.id)
         startActivity(intent)
+    }
+
+    private fun showNoEvents() {
+        progressBar.visibility = View.GONE
+        txtNoResults.text = getString(R.string.no_events)
+        txtNoResults.visibility = View.VISIBLE
     }
 
     private fun showError(error: Exception) {

@@ -9,6 +9,7 @@ import com.google.firebase.firestore.DocumentReference
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldPath
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.QuerySnapshot
 import com.google.firebase.firestore.WriteBatch
@@ -16,6 +17,7 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -127,5 +129,16 @@ class EventRepositoryTest {
 
         repository.syncLocations(emptyList()).await()
         verify(exactly = 0) { batch.commit() }
+    }
+
+    // aluno que não é admin: as regras do Firestore negam a gravação dos eventos de exemplo
+    @Test
+    fun `permission denied is recognized only for that Firestore code`() {
+        val denied = FirebaseFirestoreException("sem permissão", FirebaseFirestoreException.Code.PERMISSION_DENIED)
+        val offline = FirebaseFirestoreException("sem internet", FirebaseFirestoreException.Code.UNAVAILABLE)
+
+        assertTrue(EventRepository.isPermissionDenied(denied))
+        assertFalse(EventRepository.isPermissionDenied(offline))
+        assertFalse(EventRepository.isPermissionDenied(Exception("outro erro")))
     }
 }
