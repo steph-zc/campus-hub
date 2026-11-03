@@ -4,7 +4,6 @@ import com.google.android.gms.tasks.Task
 import com.google.android.gms.tasks.Tasks
 import com.google.firebase.firestore.FirebaseFirestoreException
 import org.junit.Assert.assertEquals
-import org.junit.Assert.fail
 import java.util.concurrent.ExecutionException
 import java.util.concurrent.TimeUnit
 
@@ -16,17 +15,21 @@ private const val TIMEOUT_SECONDS = 15L
 
 fun <T> Task<T>.await(): T = Tasks.await(this, TIMEOUT_SECONDS, TimeUnit.SECONDS)
 
+// espera a Task falhar e devolve o erro original (sem o ExecutionException do Tasks.await)
+fun Task<*>.awaitError(): Exception {
+    try {
+        await()
+    } catch (error: ExecutionException) {
+        return error.cause as Exception
+    }
+    throw AssertionError("A operação deveria ter falhado, mas foi aceita")
+}
+
 // confere que o Firestore recusou a operação por causa do firestore.rules
 // (o erro pode vir direto ou embrulhado, como acontece nas transações)
 fun Task<*>.assertPermissionDenied() {
-    val error = try {
-        await()
-        fail("As regras deveriam ter negado a operação, mas ela foi aceita")
-        return
-    } catch (error: ExecutionException) {
-        error.cause
-    }
-    val firestoreError = generateSequence(error) { it.cause }
+    val error = awaitError()
+    val firestoreError = generateSequence<Throwable>(error) { it.cause }
         .filterIsInstance<FirebaseFirestoreException>()
         .firstOrNull()
     assertEquals(

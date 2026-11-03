@@ -11,20 +11,26 @@ import br.com.uri.campushub.data.repository.FavoriteRepository
 import br.com.uri.campushub.data.repository.MediaRepository
 import br.com.uri.campushub.data.repository.RatingRepository
 import br.com.uri.campushub.data.repository.UserRepository
+import br.com.uri.campushub.testing.EmulatorData.ADMIN_EMAIL
+import br.com.uri.campushub.testing.EmulatorData.createAdmin
+import br.com.uri.campushub.testing.EmulatorData.createStudent
+import br.com.uri.campushub.testing.EmulatorData.daysFromNow
+import br.com.uri.campushub.testing.EmulatorData.moveEventDate
+import br.com.uri.campushub.testing.EmulatorData.saveEvents
+import br.com.uri.campushub.testing.EmulatorData.signIn
+import br.com.uri.campushub.testing.EmulatorData.signUp
 import br.com.uri.campushub.testing.FirebaseEmulator
 import br.com.uri.campushub.testing.assertPermissionDenied
 import br.com.uri.campushub.testing.await
-import com.google.firebase.Timestamp
 import com.google.firebase.firestore.FieldValue
 import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
-import java.util.Date
-import java.util.concurrent.TimeUnit
 
 // testes das regras de segurança (firestore.rules) no Firebase Local Emulator Suite
-// cada teste usa contas reais do emulador do Authentication e o Firestore do emulador,
+// cada teste usa contas reais do emulador do Authentication e o Firestore do emulador
+// (criadas pelo EmulatorData),
 // que aplica o firestore.rules do projeto em toda leitura e gravação.
 // As operações permitidas passam pelos repositórios do app (o mesmo código das telas);
 // as tentativas de burlar as regras gravam direto pelo SDK do Firestore, como faria um app alterado.
@@ -33,8 +39,6 @@ import java.util.concurrent.TimeUnit
 class FirestoreRulesTest {
 
     private companion object {
-        const val PASSWORD = "senha123"
-        const val ADMIN_EMAIL = "admin@campushub.test"
         const val ANA_EMAIL = "ana@campushub.test"
         const val BETO_EMAIL = "beto@campushub.test"
 
@@ -45,7 +49,6 @@ class FirestoreRulesTest {
         const val ENDED = "encerrado"
     }
 
-    private val auth = FirebaseEmulator.auth
     private val db = FirebaseEmulator.firestore
 
     private val users = UserRepository(db)
@@ -65,18 +68,16 @@ class FirestoreRulesTest {
     fun setUp() {
         FirebaseEmulator.clearData()
 
-        val adminUid = signUp(ADMIN_EMAIL)
-        FirebaseEmulator.makeAdmin(adminUid)
-        saveEvent(OPEN, Event(title = "Aberto", date = daysFromNow(7), capacity = 10))
-        saveEvent(LAW_ONLY, Event(title = "Só Direito", date = daysFromNow(7), capacity = 10, course = "Direito", openToAll = false))
-        saveEvent(FULL, Event(title = "Lotado", date = daysFromNow(7), capacity = 1, enrolledCount = 1))
-        saveEvent(ENDED, Event(title = "Encerrado", date = daysFromNow(-1), capacity = 10))
+        createAdmin()
+        saveEvents(mapOf(
+            OPEN to Event(title = "Aberto", date = daysFromNow(7), capacity = 10),
+            LAW_ONLY to Event(title = "Só Direito", date = daysFromNow(7), capacity = 10, course = "Direito", openToAll = false),
+            FULL to Event(title = "Lotado", date = daysFromNow(7), capacity = 1, enrolledCount = 1),
+            ENDED to Event(title = "Encerrado", date = daysFromNow(-1), capacity = 10)
+        ))
 
-        betoUid = signUp(BETO_EMAIL)
-        users.create(betoUid, User("Beto", "Direito", BETO_EMAIL)).await()
-
-        anaUid = signUp(ANA_EMAIL)
-        users.create(anaUid, User("Ana", "Ciência da Computação", ANA_EMAIL)).await()
+        betoUid = createStudent(BETO_EMAIL, "Beto", "Direito")
+        anaUid = createStudent(ANA_EMAIL, "Ana", "Ciência da Computação")
     }
 
     // ---------- perfil ----------
@@ -215,8 +216,7 @@ class FirestoreRulesTest {
         ratings.save(anaUid, ENDED, 5).assertPermissionDenied()
 
         // o admin passa a data do evento para ontem
-        signIn(ADMIN_EMAIL)
-        db.collection("events").document(OPEN).update("date", daysFromNow(-1)).await()
+        moveEventDate(OPEN, daysFromNow(-1))
 
         signIn(ANA_EMAIL)
         ratings.save(anaUid, OPEN, 6).assertPermissionDenied()
@@ -232,24 +232,6 @@ class FirestoreRulesTest {
     }
 
     // ---------- ajudantes ----------
-
-    // cria a conta no emulador do Authentication; o Firebase já deixa ela logada
-    private fun signUp(email: String): String {
-        auth.signOut()
-        return auth.createUserWithEmailAndPassword(email, PASSWORD).await().user!!.uid
-    }
-
-    private fun signIn(email: String) {
-        auth.signOut()
-        auth.signInWithEmailAndPassword(email, PASSWORD).await()
-    }
-
-    private fun saveEvent(id: String, event: Event) {
-        db.collection("events").document(id).set(event).await()
-    }
-
-    private fun daysFromNow(days: Int) =
-        Timestamp(Date(System.currentTimeMillis() + TimeUnit.DAYS.toMillis(days.toLong())))
 
     private fun enrollmentDoc(uid: String, eventId: String) =
         db.collection("users").document(uid).collection("enrollments").document(eventId)
