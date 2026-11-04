@@ -89,6 +89,8 @@ users/{uid}                          perfil do aluno
     favorites/{eventId}              um favorito por evento
         eventId, favoritedAt
 
+admins/{uid}                         contas que podem criar e editar eventos (criadas no console)
+
 events/{eventId}
     title, description, location, date
     category, course, openToAll
@@ -108,8 +110,25 @@ events/{eventId}
 - **Média das avaliações:** calculada pelo próprio Firestore com uma consulta de agregação (`average` e `count`), sem baixar as notas uma a uma.
 - **Comentários:** guardam o nome do autor no próprio documento, para não buscar o perfil de cada um. As datas (`createdAt`, `editedAt`) vêm do servidor, não do relógio do celular.
 - **Publicações:** o Firestore guarda só os dados (autor, tipo, nome do arquivo, duração e data). O arquivo fica na pasta privada do app, no aparelho de quem publicou, como o enunciado permite. Em outro aparelho, a publicação aparece com o aviso de que o arquivo está só no aparelho do autor. Ao excluir, o app apaga o documento e o arquivo.
-- **Eventos de exemplo:** na primeira execução, se a coleção `events` estiver vazia, o app grava 12 eventos (`SampleEvents.kt`). São 8 próximos e 4 já encerrados, de vários cursos e categorias. Sempre que a lista carrega, os eventos já gravados recebem a sala, o endereço e o ponto no mapa do exemplo de mesmo título. Assim, mudar um local no código atualiza o Firestore.
+- **Eventos de exemplo:** na primeira execução de uma conta admin, se a coleção `events` estiver vazia, o app grava 12 eventos (`SampleEvents.kt`). São 8 próximos e 4 já encerrados, de vários cursos e categorias. Sempre que a lista carrega, os eventos já gravados recebem a sala, o endereço e o ponto no mapa do exemplo de mesmo título. Assim, mudar um local no código atualiza o Firestore. Só a conta admin tem permissão para essas gravações: para os outros alunos, a lista vazia mostra "Nenhum evento cadastrado ainda".
 - **Pontos no mapa:** o OpenStreetMap não tem os prédios do campus desenhados. As coordenadas dos prédios e do Fórum de Santiago foram tiradas do Google Maps, usando a rotatória da entrada do campus como referência.
+
+### Regras de segurança
+
+O arquivo `firestore.rules` roda nos servidores do Firebase, então vale mesmo que alguém altere o app. O aluno é identificado pelo token do Authentication (`request.auth.uid`), nunca por um dado enviado pelo app. O que não está liberado é negado.
+
+| Dados | Quem pode |
+|---|---|
+| `users/{uid}` | só o próprio aluno lê. No cadastro, o email do perfil tem que ser o da conta; depois, só nome e curso mudam |
+| `favorites` | só o dono lê, grava e apaga |
+| `enrollments` | só o dono, em evento futuro e aberto ao curso dele, com o `enrolledCount` mudando 1 na mesma transação |
+| `events` | qualquer aluno logado lê. Só o admin cria e edita; o aluno só muda o `enrolledCount`, junto com a própria inscrição e sem passar da capacidade |
+| `comments` | o autor é sempre quem está logado, com texto de até 500 caracteres. Só o autor edita e exclui |
+| `ratings` | só o próprio aluno, inscrito e com o evento encerrado, com nota de 1 a 5 |
+| `media` | tipo `photo`, `audio` ou `video`, com o autor sendo quem está logado. Só o autor exclui |
+| `admins` | nenhum aluno lê ou grava. O documento é criado à mão no console |
+
+O console do Firebase não segue as regras, por isso ele é usado para criar o admin e para os ajustes manuais.
 
 ### Dados no console do Firebase
 
@@ -228,6 +247,8 @@ app/src/main/
 - osmdroid (mapa do OpenStreetMap)
 - Glide (fotos e miniaturas dos vídeos)
 - Activity Result API (câmera, galeria e permissão), MediaRecorder, MediaPlayer e VideoView
+- Regras de segurança do Cloud Firestore
+- Testes: JUnit 4, MockK, Robolectric, Kover, Firebase Local Emulator Suite, AndroidX Test e Espresso
 - minSdk 36
 
 ## Como rodar
@@ -237,8 +258,9 @@ app/src/main/
 3. Baixe o arquivo `google-services.json` e coloque na pasta `app/`. Ele não está no repositório.
 4. No console do Firebase:
    - em **Authentication > Método de login**, ative **E-mail/senha**;
-   - em **Firestore Database**, crie o banco em **modo de teste**.
-5. Sincronize o Gradle e rode o app. Os eventos de exemplo são criados no primeiro acesso à lista.
+   - em **Firestore Database**, crie o banco e publique as regras do arquivo `firestore.rules`, colando o conteúdo em **Regras > Publicar** ou com `firebase deploy --only firestore:rules`;
+   - crie a sua conta pelo app e, em **Firestore Database > Dados**, crie na raiz a coleção `admins` com um documento cujo id é o seu UID (copiado de **Authentication > Usuários**).
+5. Sincronize o Gradle e rode o app. Os eventos de exemplo são criados no primeiro acesso da conta admin à lista.
 
 ### Testar no emulador
 
@@ -258,3 +280,92 @@ O app não deixa se inscrever em eventos que já terminaram, e só quem estava i
 1. Em `events`, copie o id de um evento encerrado (por exemplo, "Dia de Campo: Manejo do Solo").
 2. Em `users/{seu uid}`, crie a subcoleção `enrollments` com um documento cujo id é o id do evento e com o campo `eventId` igual a esse id.
 3. Abra o evento no app: o cartão **Sua avaliação** aparece.
+
+## Testes
+
+| Tipo | Pasta | Ferramentas | Onde roda |
+|---|---|---|---|
+| Unidade | `app/src/test/` | JUnit 4, MockK e Robolectric; cobertura com Kover | no computador (JVM) |
+| Integração com o Firebase | `app/src/androidTest/.../data/repository/` | AndroidX Test e Firebase Local Emulator Suite | no emulador Android |
+| Regras de segurança | `app/src/androidTest/.../rules/` | AndroidX Test e Firebase Local Emulator Suite | no emulador Android |
+| Ponta a ponta (E2E) | `app/src/androidTest/.../e2e/` | Espresso e Firebase Local Emulator Suite | no emulador Android |
+
+- **Unidade:** uma classe de teste para cada classe de `domain` e `data`. As regras de `domain` são Kotlin puro. Nos repositórios, o MockK simula o Firestore e confere o caminho e os campos de cada leitura e gravação; o Robolectric dá o Android (thread principal, arquivos e leitor de mídia) sem emulador.
+- **Integração:** os repositórios do app falam com o Authentication e o Firestore do emulador do Firebase, com as regras de segurança ativas: cadastro e login, ordem das consultas, transação da última vaga, média calculada pelo servidor, entre outros.
+- **Regras de segurança:** cada teste tenta uma operação permitida e outra que um app alterado faria (mudar o contador sem inscrição, comentar em nome de outro aluno, se tornar admin...) e confere que o Firebase negou.
+- **E2E:** o Espresso abre o app na tela inicial e faz dois fluxos completos, tocando e digitando como um aluno. No fim, o teste confere no Firestore o que as telas gravaram:
+  1. cadastro → inscrição em um evento → evento em **Meus eventos**;
+  2. login → favoritar → comentar → evento em **Meus favoritos** → **Sair**.
+
+Os testes do aparelho nunca usam o projeto real: o `FirebaseEmulator.kt` liga o app ao emulador do Firebase, e o emulador é apagado antes de cada teste.
+
+```
+app/src/
+├── test/java/br/com/uri/campushub/
+│   ├── domain/                   regras do app
+│   ├── data/                     modelos, repositórios, SampleEvents e MediaStorage
+│   └── testing/                  eventos de teste e espera das Tasks do Firebase
+└── androidTest/java/br/com/uri/campushub/
+    ├── data/repository/          integração dos repositórios com o Firebase
+    ├── rules/                    regras de segurança (firestore.rules)
+    ├── e2e/                      fluxos completos com o Espresso
+    └── testing/                  conexão com o emulador, contas e eventos de teste, esperas do Espresso
+```
+
+### Rodar os testes de unidade e a cobertura
+
+```bash
+./gradlew testDebugUnitTest koverHtmlReportDebug
+```
+
+- Resultado dos testes: `app/build/reports/tests/testDebugUnitTest/index.html`
+- Cobertura: `app/build/reports/kover/htmlDebug/index.html` (coluna **Line, %**). Para ver só o total no terminal: `./gradlew koverLogDebug`
+
+A cobertura mede as camadas `domain` e `data`. Ficam de fora as telas (pacote `ui`, verificado pelos testes E2E), o `AudioRecorder` (precisa do microfone de um aparelho) e as classes geradas pelo Android (`R` e `BuildConfig`).
+
+Relatório dos testes de unidade, com uma classe de teste por classe de `domain` e `data`:
+
+![Relatório do Gradle com os testes de unidade, todos passando](docs/images/tests-unit-report.png)
+
+Relatório de cobertura do Kover, por pacote:
+
+![Relatório de cobertura do Kover por pacote](docs/images/tests-coverage-kover.png)
+
+### Rodar os testes de integração, de regras e E2E
+
+1. Instale o Firebase CLI (precisa do Node.js e do Java 21):
+
+   ```bash
+   npm install -g firebase-tools
+   ```
+
+2. Em um terminal, na raiz do projeto, inicie o emulador do Firebase (Authentication na porta 9099, Firestore na 8080 e a Emulator UI em http://localhost:4000):
+
+   ```bash
+   firebase emulators:start
+   ```
+
+3. Com o emulador Android aberto, rode em outro terminal:
+
+   ```bash
+   ./gradlew connectedDebugAndroidTest
+   ```
+
+   Para rodar só uma classe, por exemplo os E2E:
+
+   ```bash
+   ./gradlew connectedDebugAndroidTest "-Pandroid.testInstrumentationRunnerArguments.class=br.com.uri.campushub.e2e.UserFlowTest"
+   ```
+
+- Resultado: `app/build/reports/androidTests/connected/debug/index.html`
+- O emulador Android chega ao computador pelo endereço `10.0.2.2`. Só a versão de debug libera essa conexão sem HTTPS (`app/src/debug/res/xml/network_security_config.xml`).
+- Em um celular físico, rode `adb reverse tcp:8080 tcp:8080` e `adb reverse tcp:9099 tcp:9099` e acrescente `-Pandroid.testInstrumentationRunnerArguments.firebaseEmulatorHost=localhost` ao comando.
+- **Windows:** se o `firebase emulators:start` disser que a porta está ocupada, um processo do emulador anterior ficou aberto. Feche-o no PowerShell:
+
+  ```powershell
+  Get-NetTCPConnection -LocalPort 4000,4400,4500,8080,9099 -State Listen | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }
+  ```
+
+Relatório dos testes do aparelho, com os pacotes de integração (`data.repository`), E2E (`e2e`) e regras de segurança (`rules`):
+
+![Relatório dos testes de integração, E2E e de regras no emulador Android, todos passando](docs/images/tests-android-report.png)
