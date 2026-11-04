@@ -36,6 +36,9 @@ android {
     }
 
     testOptions {
+        // desliga as animações do aparelho durante os testes do Espresso (androidTest),
+        // para os toques não caírem no meio de uma transição de tela
+        animationsDisabled = true
         // o Robolectric lê os recursos do app (textos, layouts) nos testes unitários
         unitTests.isIncludeAndroidResources = true
         unitTests.all { test ->
