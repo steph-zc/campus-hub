@@ -253,14 +253,28 @@ app/src/main/
 
 ## Como rodar
 
+### Requisitos
+
+- **Android Studio** em uma versão atual. O projeto usa o Android Gradle Plugin 9.3, e o Gradle 9.5 é baixado sozinho pelo `gradlew`.
+- **Emulador ou celular com Android 16 (API 36) ou mais recente.** O app tem `minSdk 36` e não instala em versões anteriores. No Android Studio, crie o emulador em **Device Manager > Create Virtual Device** com uma imagem de sistema API 36 ou superior (o projeto foi testado no Android 17, API 37).
+- Para os testes de integração, de regras e E2E: **Node.js** e **Java 21**, usados pelo Firebase CLI (veja [Testes](#testes)).
+
+Os comandos `./gradlew` deste README funcionam no PowerShell e no terminal do Android Studio. No Prompt de Comando (cmd) do Windows, use `gradlew` sem o `./`.
+
+### Passo a passo
+
 1. Clone o repositório e abra no Android Studio.
 2. Crie um projeto no [console do Firebase](https://console.firebase.google.com/) e adicione um app Android com o pacote `br.com.uri.campushub`.
 3. Baixe o arquivo `google-services.json` e coloque na pasta `app/`. Ele não está no repositório.
-4. No console do Firebase:
+4. No arquivo `.firebaserc`, na raiz do projeto, troque `campushub-50d7f` pelo id do seu projeto, que aparece no campo `project_id` do `google-services.json`. O Firebase CLI usa esse id para publicar as regras e para rodar o emulador dos testes.
+5. No console do Firebase:
    - em **Authentication > Método de login**, ative **E-mail/senha**;
-   - em **Firestore Database**, crie o banco e publique as regras do arquivo `firestore.rules`, colando o conteúdo em **Regras > Publicar** ou com `firebase deploy --only firestore:rules`;
-   - crie a sua conta pelo app e, em **Firestore Database > Dados**, crie na raiz a coleção `admins` com um documento cujo id é o seu UID (copiado de **Authentication > Usuários**).
-5. Sincronize o Gradle e rode o app. Os eventos de exemplo são criados no primeiro acesso da conta admin à lista.
+   - em **Firestore Database**, crie o banco e publique as regras do arquivo `firestore.rules`, colando o conteúdo em **Regras > Publicar** ou, pelo terminal, com `firebase login` e depois `firebase deploy --only firestore:rules`.
+6. Sincronize o Gradle, rode o app e crie a sua conta em **Registrar**. A lista mostra "Nenhum evento cadastrado ainda", porque a conta ainda não é admin.
+7. Torne a sua conta admin: em **Firestore Database > Dados**, crie na raiz (ao lado de `users`) a coleção `admins`, no plural, com um documento cujo id é o seu UID. O UID aparece em **Authentication > Usuários** e também é o id do seu documento em `users`. O documento pode ficar sem campos.
+8. Feche e abra o app de novo. Na lista, a conta admin grava os 12 eventos de exemplo.
+
+Se a lista continuar vazia no passo 8, as regras não reconheceram a conta como admin. Confira se a coleção se chama exatamente `admins`, se ela está na raiz e se o id do documento é igual ao id do seu documento em `users`.
 
 ### Testar no emulador
 
@@ -297,7 +311,7 @@ O app não deixa se inscrever em eventos que já terminaram, e só quem estava i
   1. cadastro → inscrição em um evento → evento em **Meus eventos**;
   2. login → favoritar → comentar → evento em **Meus favoritos** → **Sair**.
 
-Os testes do aparelho nunca usam o projeto real: o `FirebaseEmulator.kt` liga o app ao emulador do Firebase, e o emulador é apagado antes de cada teste.
+Os testes do aparelho nunca usam o projeto real: o `FirebaseEmulator.kt` liga o app ao emulador do Firebase, e o emulador é apagado antes de cada teste. Por isso, para rodar os testes, bastam os passos 1 a 4 de [Como rodar](#como-rodar). O `google-services.json` é necessário para o projeto compilar, mas as configurações do console (passos 5 a 8) não são usadas.
 
 ```
 app/src/
@@ -344,6 +358,8 @@ Relatório de cobertura do Kover, por pacote:
    ```bash
    firebase emulators:start
    ```
+
+   O emulador aplica o `firestore.rules` ao projeto do `.firebaserc`, que precisa ser o mesmo `project_id` do `google-services.json` (passo 4 de [Como rodar](#como-rodar)). Se forem diferentes, o log do emulador avisa "Multiple projectIds are not recommended in single project mode", as regras não são aplicadas e os testes de regras falham.
 
 3. Com o emulador Android aberto, rode em outro terminal:
 
