@@ -3,6 +3,7 @@ package br.com.uri.campushub.rules
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import br.com.uri.campushub.data.model.Event
 import br.com.uri.campushub.data.model.MediaPost
+import br.com.uri.campushub.data.model.Role
 import br.com.uri.campushub.data.model.User
 import br.com.uri.campushub.data.repository.CommentRepository
 import br.com.uri.campushub.data.repository.EnrollmentRepository
@@ -13,6 +14,7 @@ import br.com.uri.campushub.data.repository.RatingRepository
 import br.com.uri.campushub.data.repository.UserRepository
 import br.com.uri.campushub.testing.EmulatorData.ADMIN_EMAIL
 import br.com.uri.campushub.testing.EmulatorData.createAdmin
+import br.com.uri.campushub.testing.EmulatorData.createOrganizer
 import br.com.uri.campushub.testing.EmulatorData.createStudent
 import br.com.uri.campushub.testing.EmulatorData.daysFromNow
 import br.com.uri.campushub.testing.EmulatorData.moveEventDate
@@ -41,6 +43,7 @@ class FirestoreRulesTest {
     private companion object {
         const val ANA_EMAIL = "ana@campushub.test"
         const val BETO_EMAIL = "beto@campushub.test"
+        const val CAIO_EMAIL = "caio.org@campushub.test"
 
         // eventos criados pela conta admin antes de cada teste
         const val OPEN = "aberto"
@@ -229,6 +232,20 @@ class FirestoreRulesTest {
     @Test
     fun studentCannotMakeThemselvesAdmin() {
         db.collection("admins").document(anaUid).set(mapOf<String, Any>()).assertPermissionDenied()
+    }
+
+    // ---------- organizadores ----------
+
+    // cada conta lê só o próprio organizers/{uid}; ninguém grava nessa coleção pelo app
+    @Test
+    fun organizerRoleIsPrivateAndCannotBeSelfGranted() {
+        val caioUid = createOrganizer(CAIO_EMAIL, "Caio", "Direito")
+        assertEquals(Role.ORGANIZER, users.getRole(caioUid).await())
+
+        signIn(ANA_EMAIL)
+        assertEquals(Role.STUDENT, users.getRole(anaUid).await())
+        db.collection("organizers").document(caioUid).get().assertPermissionDenied()
+        db.collection("organizers").document(anaUid).set(mapOf<String, Any>()).assertPermissionDenied()
     }
 
     // ---------- ajudantes ----------

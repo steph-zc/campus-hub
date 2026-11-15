@@ -21,6 +21,13 @@
         android:title="@string/profile"
         app:showAsAction="ifRoom" />
 
+    <!-- só aparece para contas organizadoras (EventsActivity.onPrepareOptionsMenu) -->
+    <item
+        android:id="@+id/menuOrganizedEvents"
+        android:title="@string/organized_events"
+        android:visible="false"
+        app:showAsAction="never" />
+
     <item
         android:id="@+id/menuLogout"
         android:title="@string/logout"

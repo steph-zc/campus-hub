@@ -124,6 +124,9 @@
     <string name="cancel_enrollment_question">Cancelar sua inscrição neste evento?</string>
     <string name="keep_enrollment">Manter</string>
     <string name="my_events">Meus eventos</string>
+    <string name="organized_events">Eventos que organizo</string>
+    <string name="no_organized_events">Nenhum evento organizado ainda</string>
+    <string name="no_organized_events_hint">Os eventos sob a sua responsabilidade vão aparecer aqui.</string>
     <string name="no_enrollments">Nenhuma inscrição ainda</string>
     <string name="no_enrollments_hint">Os eventos em que você se inscrever vão aparecer aqui.</string>
     <string name="browse_events">Ver eventos</string>

@@ -111,6 +111,19 @@ class EventRepositoryTest {
         assertEquals("event-1", result.last().id)
     }
 
+    // a consulta filtra pelo dono; a ordem por data é feita no app (sem índice composto)
+    @Test
+    fun `organizer events are filtered by owner and sorted by date`() {
+        val later = event(id = "later", daysFromNow = 5)
+        val sooner = event(id = "sooner", daysFromNow = 2)
+        every { events.whereEqualTo("organizerId", "uid-org") } returns queryReturning(listOf(later, sooner))
+
+        val result = repository.getByOrganizer("uid-org").await()
+
+        assertEquals(listOf("sooner", "later"), result.map { it.id })
+        verify { events.whereEqualTo("organizerId", "uid-org") }
+    }
+
     @Test
     fun `sample events are saved in a single batch`() {
         val batch = mockk<WriteBatch>(relaxed = true)

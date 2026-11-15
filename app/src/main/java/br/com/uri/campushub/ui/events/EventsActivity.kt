@@ -16,6 +16,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import br.com.uri.campushub.R
 import br.com.uri.campushub.data.model.Event
+import br.com.uri.campushub.data.model.Role
 import br.com.uri.campushub.data.repository.AuthRepository
 import br.com.uri.campushub.data.repository.EventRepository
 import br.com.uri.campushub.data.repository.UserRepository
@@ -24,6 +25,7 @@ import br.com.uri.campushub.ui.auth.MainActivity
 import br.com.uri.campushub.ui.common.applySystemBarsPadding
 import br.com.uri.campushub.ui.common.setupToolbar
 import br.com.uri.campushub.ui.details.EventDetailsActivity
+import br.com.uri.campushub.ui.organizer.OrganizerEventsActivity
 import br.com.uri.campushub.ui.profile.ProfileActivity
 import com.google.android.material.appbar.AppBarLayout
 import com.google.android.material.appbar.MaterialToolbar
@@ -49,6 +51,9 @@ class EventsActivity : AppCompatActivity() {
 
     // todos os eventos do Firestore; a lista mostrada é esta depois de filtrada
     private var allEvents = listOf<Event>()
+
+    // papel da conta logada; começa como aluno e muda quando o UserRepository responde
+    private var role = Role.STUDENT
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -99,7 +104,18 @@ class EventsActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         loadUserName()
+        loadRole()
         loadEvents()
+    }
+
+    // lê organizers/{uid} no Firestore; se a conta for organizadora, o menu ganha "Eventos que organizo"
+    private fun loadRole() {
+        userRepository.getRole(authRepository.requireUserId())
+            .addOnSuccessListener { loaded ->
+                role = loaded
+                // pede ao Android para montar o menu de novo (chama o onPrepareOptionsMenu)
+                invalidateOptionsMenu()
+            }
     }
 
     private fun loadUserName() {
@@ -187,6 +203,12 @@ class EventsActivity : AppCompatActivity() {
         return true
     }
 
+    // a área do organizador só aparece para quem tem o papel; o aluno nem vê a opção
+    override fun onPrepareOptionsMenu(menu: Menu): Boolean {
+        menu.findItem(R.id.menuOrganizedEvents).isVisible = role == Role.ORGANIZER
+        return super.onPrepareOptionsMenu(menu)
+    }
+
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         when (item.itemId) {
             R.id.menuMyEvents -> {
@@ -199,6 +221,10 @@ class EventsActivity : AppCompatActivity() {
             }
             R.id.menuProfile -> {
                 startActivity(Intent(this, ProfileActivity::class.java))
+                return true
+            }
+            R.id.menuOrganizedEvents -> {
+                startActivity(Intent(this, OrganizerEventsActivity::class.java))
                 return true
             }
             R.id.menuLogout -> {

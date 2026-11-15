@@ -47,6 +47,11 @@
             android:name=".ui.events.MyEventsActivity"
             android:theme="@style/Theme.CampusHub.NoActionBar" />
 
+        <!-- área do organizador; o menu só mostra a opção para contas organizadoras -->
+        <activity
+            android:name=".ui.organizer.OrganizerEventsActivity"
+            android:theme="@style/Theme.CampusHub.NoActionBar" />
+
         <activity
             android:name=".ui.profile.ProfileActivity"
             android:theme="@style/Theme.CampusHub.NoActionBar"

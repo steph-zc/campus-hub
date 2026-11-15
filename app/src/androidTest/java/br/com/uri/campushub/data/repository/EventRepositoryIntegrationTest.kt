@@ -2,10 +2,13 @@ package br.com.uri.campushub.data.repository
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import br.com.uri.campushub.data.model.Event
+import br.com.uri.campushub.testing.EmulatorData.ADMIN_EMAIL
 import br.com.uri.campushub.testing.EmulatorData.createAdmin
+import br.com.uri.campushub.testing.EmulatorData.createOrganizer
 import br.com.uri.campushub.testing.EmulatorData.createStudent
 import br.com.uri.campushub.testing.EmulatorData.daysFromNow
 import br.com.uri.campushub.testing.EmulatorData.saveEvents
+import br.com.uri.campushub.testing.EmulatorData.signIn
 import br.com.uri.campushub.testing.FirebaseEmulator
 import br.com.uri.campushub.testing.await
 import org.junit.Assert.assertEquals
@@ -64,6 +67,21 @@ class EventRepositoryIntegrationTest {
 
         assertEquals(ids, events.getByIds(ids.reversed()).await().map { it.id })
         assertTrue(events.getByIds(emptyList()).await().isEmpty())
+    }
+
+    // a área do organizador traz só os eventos com o uid dele em organizerId, ordenados por data
+    @Test
+    fun organizerGetsOnlyTheirOwnEvents() {
+        val caioUid = createOrganizer("caio@campushub.test", "Caio", "Direito")
+        signIn(ADMIN_EMAIL)
+        saveEvents(mapOf(
+            "depois" to Event(title = "Depois", date = daysFromNow(9), organizerId = caioUid),
+            "antes" to Event(title = "Antes", date = daysFromNow(3), organizerId = caioUid),
+            "de-outro" to Event(title = "De outro", date = daysFromNow(5), organizerId = "outro-uid")
+        ))
+        signIn("caio@campushub.test")
+
+        assertEquals(listOf("Antes", "Depois"), events.getByOrganizer(caioUid).await().map { it.title })
     }
 
     // primeira execução na conta admin: grava os 12 exemplos; a sincronização devolve

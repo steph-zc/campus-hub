@@ -58,13 +58,19 @@ object FirebaseEmulator {
         send("DELETE", "http://$host:$AUTH_PORT/emulator/v1/projects/$projectId/accounts")
     }
 
-    // cria admins/{uid}, o que dá à conta a permissão de admin do firestore.rules.
-    // O app não consegue gravar nessa coleção; aqui a API REST do emulador recebe o token
+    // cria admins/{uid}, o que dá à conta a permissão de admin do firestore.rules
+    fun makeAdmin(uid: String) = createRoleDocument("admins", uid)
+
+    // cria organizers/{uid}, o que torna a conta organizadora (UserRepository.getRole e firestore.rules)
+    fun makeOrganizer(uid: String) = createRoleDocument("organizers", uid)
+
+    // documento vazio com o id da conta: só a existência dele importa.
+    // O app não consegue gravar nessas coleções; aqui a API REST do emulador recebe o token
     // "owner", que ignora as regras, como o console do Firebase faz no projeto real
-    fun makeAdmin(uid: String) {
+    private fun createRoleDocument(collection: String, uid: String) {
         send(
             "POST",
-            "http://$host:$FIRESTORE_PORT/v1/projects/$projectId/databases/(default)/documents/admins?documentId=$uid",
+            "http://$host:$FIRESTORE_PORT/v1/projects/$projectId/databases/(default)/documents/$collection?documentId=$uid",
             body = "{\"fields\": {}}"
         )
     }

@@ -43,6 +43,13 @@ object EmulatorData {
         return uid
     }
 
+    // conta com perfil de aluno e organizers/{uid}, como o console faz; fica logada
+    fun createOrganizer(email: String, name: String, course: String): String {
+        val uid = createStudent(email, name, course)
+        FirebaseEmulator.makeOrganizer(uid)
+        return uid
+    }
+
     // grava eventos com ids fixos; precisa da conta admin logada
     fun saveEvents(events: Map<String, Event>) {
         db.runBatch { batch ->

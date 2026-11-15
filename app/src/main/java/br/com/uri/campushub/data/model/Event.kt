@@ -26,7 +26,9 @@ data class Event(
     // endereço da rua; "location" continua sendo o lugar dentro do campus (sala, auditório...)
     val address: String = "",
     // ponto do evento no mapa; null nos eventos ainda sem localização
-    val coordinates: GeoPoint? = null
+    val coordinates: GeoPoint? = null,
+    // uid do organizador responsável (Authentication); vazio nos eventos de exemplo do admin
+    val organizerId: String = ""
 ) {
     fun remainingSpots() = (capacity - enrolledCount).coerceAtLeast(0)
 

@@ -45,6 +45,12 @@ class EventRepository(private val db: FirebaseFirestore = FirebaseFirestore.getI
             }
     }
 
+    // eventos sob a responsabilidade de um organizador (campo organizerId), do mais antigo para o mais novo;
+    // a ordem é feita no app para a consulta não precisar de um índice composto no Firestore
+    fun getByOrganizer(organizerId: String): Task<List<Event>> =
+        events.whereEqualTo("organizerId", organizerId).get()
+            .continueWith { task -> task.result.toObjects(Event::class.java).sortedBy { it.date } }
+
     // grava os eventos de exemplo; a tela chama quando a coleção está vazia (só a conta admin consegue)
     fun saveSampleEvents(): Task<Void> = SampleEvents.save(db)
 
