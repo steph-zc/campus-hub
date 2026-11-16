@@ -35,6 +35,13 @@ class EventTest {
         assertFalse(event(daysFromNow = null).hasEnded(NOW))
     }
 
+    // imageVersion 0 = sem capa; qualquer versão gravada = tem capa em eventImages
+    @Test
+    fun `event has an image only with a saved version`() {
+        assertFalse(Event().withImage())
+        assertTrue(Event(imageVersion = 1_700_000_000_000L).withImage())
+    }
+
     @Test
     fun `open event accepts any course and exclusive event only its own`() {
         assertTrue(event(course = "Direito", openToAll = true).acceptsCourse("Medicina"))

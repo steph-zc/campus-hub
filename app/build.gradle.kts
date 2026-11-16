@@ -57,6 +57,9 @@ kover {
                 // o gravador de áudio depende do microfone, que não existe nos testes unitários
                 packages("br.com.uri.campushub.ui")
                 classes("br.com.uri.campushub.data.media.AudioRecorder")
+                // o ImageDecoder nativo não roda no Robolectric no Windows; o ImageCompressor é testado no
+                // aparelho (androidTest/data/media) e a compressão em si (JpegEncoder) nos testes unitários
+                classes("br.com.uri.campushub.data.media.ImageCompressor")
                 // classes geradas pelo build
                 classes("*.R", "*.R$*", "*.BuildConfig")
             }

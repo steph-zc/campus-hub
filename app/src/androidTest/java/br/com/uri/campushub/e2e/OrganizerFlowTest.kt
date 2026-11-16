@@ -3,6 +3,8 @@ package br.com.uri.campushub.e2e
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.Color
 import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.espresso.Espresso.closeSoftKeyboard
@@ -14,6 +16,8 @@ import androidx.test.espresso.matcher.ViewMatchers.withId
 import androidx.test.espresso.matcher.ViewMatchers.withText
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import br.com.uri.campushub.R
+import br.com.uri.campushub.data.media.JpegEncoder
+import br.com.uri.campushub.data.repository.EventImageRepository
 import br.com.uri.campushub.data.repository.EventRepository
 import br.com.uri.campushub.testing.EmulatorData.createOrganizer
 import br.com.uri.campushub.testing.EmulatorData.eventDraft
@@ -43,13 +47,14 @@ class OrganizerFlowTest {
 
     private val context = ApplicationProvider.getApplicationContext<Context>()
     private val events = EventRepository(FirebaseEmulator.firestore)
+    private lateinit var uid: String
     private lateinit var eventId: String
 
     // emulador zerado com um evento do organizador ainda sem ponto no mapa; o organizador fica logado
     @Before
     fun setUp() {
         FirebaseEmulator.clearData()
-        val uid = createOrganizer(ORGANIZER_EMAIL, "Caio Souza", "Direito")
+        uid = createOrganizer(ORGANIZER_EMAIL, "Caio Souza", "Direito")
         eventId = events.create(uid, eventDraft()).await()
     }
 
@@ -61,7 +66,7 @@ class OrganizerFlowTest {
     @Test
     fun organizerMarksTheExactPointWithPastedCoordinates() {
         openForm().use {
-            waitFor(withId(R.id.btnFindOnMap))
+            waitFor(withId(R.id.scrollContent))
             onView(withId(R.id.edtAddress)).perform(nestedScrollTo(), replaceText(PASTED_COORDINATES))
             closeSoftKeyboard()
             onView(withId(R.id.btnFindOnMap)).perform(nestedScrollTo(), click())
@@ -80,7 +85,7 @@ class OrganizerFlowTest {
     @Test
     fun organizerRemovesThePointAndTheEventHasNoMap() {
         openForm().use {
-            waitFor(withId(R.id.btnFindOnMap))
+            waitFor(withId(R.id.scrollContent))
             onView(withId(R.id.edtAddress)).perform(nestedScrollTo(), replaceText(PASTED_COORDINATES))
             closeSoftKeyboard()
             onView(withId(R.id.btnFindOnMap)).perform(nestedScrollTo(), click())
@@ -94,5 +99,26 @@ class OrganizerFlowTest {
         }
 
         assertNull(events.get(eventId).await()?.coordinates)
+    }
+
+    // evento com capa: o formulário mostra a imagem salva; o organizador remove e salva sem capa.
+    // (o Photo Picker é uma tela do sistema, fora do alcance do Espresso; a capa é gravada pelo repositório)
+    @Test
+    fun organizerSeesTheSavedCoverAndRemovesIt() {
+        val cover = Bitmap.createBitmap(160, 90, Bitmap.Config.ARGB_8888).apply { eraseColor(Color.rgb(30, 90, 160)) }
+        eventId = events.create(uid, eventDraft(title = "Feira de Ciências"), JpegEncoder.encode(cover)).await()
+
+        openForm().use {
+            waitFor(withId(R.id.imgCover))
+            onView(withId(R.id.btnPickImage)).check(matches(withText(R.string.change_image)))
+
+            onView(withId(R.id.btnRemoveImage)).perform(click())
+            waitFor(withId(R.id.txtNoImage))
+            onView(withId(R.id.btnSave)).perform(nestedScrollTo(), click())
+            assertEquals(Activity.RESULT_OK, it.result.resultCode)
+        }
+
+        assertEquals(0L, events.get(eventId).await()?.imageVersion)
+        assertNull(EventImageRepository(FirebaseEmulator.firestore).read(eventId).await())
     }
 }

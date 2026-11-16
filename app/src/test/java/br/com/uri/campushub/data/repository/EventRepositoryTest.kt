@@ -2,13 +2,14 @@ package br.com.uri.campushub.data.repository
 
 import br.com.uri.campushub.data.model.Event
 import br.com.uri.campushub.data.model.EventDraft
+import br.com.uri.campushub.data.model.EventImageChange
 import br.com.uri.campushub.testing.TestEvents
 import br.com.uri.campushub.testing.TestEvents.event
 import br.com.uri.campushub.testing.await
 import com.google.android.gms.tasks.Tasks
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.GeoPoint
-import io.mockk.slot
+import com.google.firebase.firestore.Blob
 import com.google.firebase.firestore.CollectionReference
 import com.google.firebase.firestore.DocumentReference
 import com.google.firebase.firestore.DocumentSnapshot
@@ -37,13 +38,28 @@ class EventRepositoryTest {
 
     private val db = mockk<FirebaseFirestore>()
     private val events = mockk<CollectionReference>()
+    private val images = mockk<CollectionReference>()
     private lateinit var repository: EventRepository
+
+    private companion object {
+        // relógio fixo: a versão da imagem nova é sempre esta
+        const val VERSION = 1_700_000_000_000L
+    }
 
     @Before
     fun setUp() {
         every { db.collection("events") } returns events
+        every { db.collection("eventImages") } returns images
         // o repositório guarda a coleção ao ser criado, então é criado depois de simulá-la
-        repository = EventRepository(db)
+        repository = EventRepository(db) { VERSION }
+    }
+
+    // lote (WriteBatch) simulado que guarda as operações; o commit dá certo
+    private fun recordingBatch(): WriteBatch {
+        val batch = mockk<WriteBatch>(relaxed = true)
+        every { db.batch() } returns batch
+        every { batch.commit() } returns Tasks.forResult(null)
+        return batch
     }
 
     // consulta falsa que devolve esses eventos
@@ -130,31 +146,86 @@ class EventRepositoryTest {
         openToAll = false
     )
 
-    // o Firestore gera o id; o documento leva o formulário, o dono e o contador zerado
+    private val jpeg = byteArrayOf(1, 2, 3)
+
+    // o Firestore gera o id; o documento leva o formulário, o dono, o contador zerado e imageVersion 0
     @Test
     fun `new event saves the form with its organizer and no enrollments`() {
         val doc = mockk<DocumentReference>()
-        val data = slot<Map<String, Any?>>()
         every { events.document() } returns doc
         every { doc.id } returns "novo-evento"
-        every { doc.set(capture(data)) } returns Tasks.forResult(null)
+        val batch = recordingBatch()
 
         assertEquals("novo-evento", repository.create("uid-caio", draft).await())
-        assertEquals(draft.toMap() + mapOf("organizerId" to "uid-caio", "enrolledCount" to 0), data.captured)
+
+        val expected = draft.toMap() + mapOf("organizerId" to "uid-caio", "enrolledCount" to 0, "imageVersion" to 0L)
+        verify { batch.set(doc, expected) }
+        // sem imagem, nada é gravado em eventImages
+        verify(exactly = 0) { images.document(any()) }
     }
 
-    // a edição manda só os campos do formulário: organizerId e enrolledCount ficam de fora
+    // com imagem: o evento aponta para a versão e eventImages/{id} recebe o JPEG, no mesmo lote
+    @Test
+    fun `new event with image saves both in one batch`() {
+        val doc = mockk<DocumentReference>()
+        val imageDoc = mockk<DocumentReference>()
+        every { events.document() } returns doc
+        every { doc.id } returns "novo-evento"
+        every { images.document("novo-evento") } returns imageDoc
+        val batch = recordingBatch()
+
+        repository.create("uid-caio", draft, jpeg).await()
+
+        val expected = draft.toMap() + mapOf("organizerId" to "uid-caio", "enrolledCount" to 0, "imageVersion" to VERSION)
+        verify { batch.set(doc, expected) }
+        verify { batch.set(imageDoc, mapOf("jpeg" to Blob.fromBytes(jpeg), "version" to VERSION)) }
+        verify(exactly = 1) { batch.commit() }
+    }
+
+    // a edição manda só os campos do formulário: organizerId, enrolledCount e imageVersion ficam de fora
     @Test
     fun `editing updates only the form fields`() {
         val doc = mockk<DocumentReference>()
         every { events.document("event-1") } returns doc
-        every { doc.update(draft.toMap()) } returns Tasks.forResult(null)
+        val batch = recordingBatch()
 
         repository.update("event-1", draft).await()
 
-        verify { doc.update(draft.toMap()) }
+        verify { batch.update(doc, draft.toMap()) }
+        verify(exactly = 0) { images.document(any()) }
         assertFalse(draft.toMap().containsKey("organizerId"))
         assertFalse(draft.toMap().containsKey("enrolledCount"))
+        assertFalse(draft.toMap().containsKey("imageVersion"))
+    }
+
+    // imagem trocada: versão nova no evento e o JPEG novo em eventImages, no mesmo lote
+    @Test
+    fun `replacing the image bumps the version with the new bytes`() {
+        val doc = mockk<DocumentReference>()
+        val imageDoc = mockk<DocumentReference>()
+        every { events.document("event-1") } returns doc
+        every { images.document("event-1") } returns imageDoc
+        val batch = recordingBatch()
+
+        repository.update("event-1", draft, EventImageChange.Replace(jpeg)).await()
+
+        verify { batch.update(doc, draft.toMap() + ("imageVersion" to VERSION)) }
+        verify { batch.set(imageDoc, mapOf("jpeg" to Blob.fromBytes(jpeg), "version" to VERSION)) }
+    }
+
+    // imagem removida: o evento volta para a versão 0 e o documento da imagem é apagado
+    @Test
+    fun `removing the image resets the version and deletes the bytes`() {
+        val doc = mockk<DocumentReference>()
+        val imageDoc = mockk<DocumentReference>()
+        every { events.document("event-1") } returns doc
+        every { images.document("event-1") } returns imageDoc
+        val batch = recordingBatch()
+
+        repository.update("event-1", draft, EventImageChange.Remove).await()
+
+        verify { batch.update(doc, draft.toMap() + ("imageVersion" to 0L)) }
+        verify { batch.delete(imageDoc) }
     }
 
     // a consulta filtra pelo dono; a ordem por data é feita no app (sem índice composto)

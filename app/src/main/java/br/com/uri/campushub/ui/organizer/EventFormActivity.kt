@@ -1,18 +1,24 @@
 package br.com.uri.campushub.ui.organizer
 
+import android.net.Uri
 import android.os.Bundle
 import android.view.View
 import android.widget.ArrayAdapter
+import android.widget.ImageView
 import android.widget.AutoCompleteTextView
 import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.widget.NestedScrollView
 import br.com.uri.campushub.R
 import br.com.uri.campushub.data.location.AddressGeocoder
+import br.com.uri.campushub.data.media.ImageCompressor
 import br.com.uri.campushub.data.model.Event
 import br.com.uri.campushub.data.model.EventDraft
+import br.com.uri.campushub.data.model.EventImageChange
 import br.com.uri.campushub.data.model.Role
 import br.com.uri.campushub.data.repository.AuthRepository
 import br.com.uri.campushub.data.repository.EventRepository
@@ -21,6 +27,7 @@ import br.com.uri.campushub.domain.CoordinateParser
 import br.com.uri.campushub.domain.EventDateTime
 import br.com.uri.campushub.domain.EventFormValidator
 import br.com.uri.campushub.domain.OrganizerRules
+import br.com.uri.campushub.ui.common.EventImages
 import br.com.uri.campushub.ui.common.applySystemBarsPadding
 import br.com.uri.campushub.ui.details.EventMap
 import br.com.uri.campushub.ui.common.setupToolbar
@@ -41,6 +48,7 @@ import com.google.firebase.firestore.GeoPoint
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
+import java.io.File
 import java.util.Locale
 import org.osmdroid.views.MapView
 
@@ -49,6 +57,7 @@ import org.osmdroid.views.MapView
 // Usa: EventFormValidator e EventDateTime (domain) para validar e montar a data;
 // AddressGeocoder (data/location) e CoordinateParser (domain) para achar o ponto a partir do endereço
 // ou das coordenadas coladas; MapPointPicker (osmdroid) para o organizador marcar o ponto exato;
+// Photo Picker do Android + ImageCompressor (data/media) para a imagem de capa, mostrada pelo EventImages;
 // EventRepository (Firestore, coleção events) para gravar; UserRepository para o papel e o curso.
 // As permissões de verdade ficam no firestore.rules: só o dono do evento consegue gravar
 class EventFormActivity : AppCompatActivity() {
@@ -63,12 +72,22 @@ class EventFormActivity : AppCompatActivity() {
         private const val STATE_LATITUDE = "latitude"
         private const val STATE_LONGITUDE = "longitude"
         private const val STATE_POINT_CLEARED = "point_cleared"
+        private const val STATE_IMAGE = "image"
+
+        // imagem nova ainda não salva fica num arquivo do cache: os bytes são grandes demais
+        // para o Bundle do onSaveInstanceState (limite de ~1 MB para a tela inteira)
+        private const val PENDING_IMAGE_FILE = "event_form_image.jpg"
     }
 
     private lateinit var appBar: AppBarLayout
     private lateinit var toolbar: MaterialToolbar
     private lateinit var scrollContent: NestedScrollView
     private lateinit var progressBar: ProgressBar
+    private lateinit var imgCover: ImageView
+    private lateinit var txtNoImage: TextView
+    private lateinit var progressImage: ProgressBar
+    private lateinit var btnPickImage: MaterialButton
+    private lateinit var btnRemoveImage: MaterialButton
     private lateinit var edtTitle: TextInputEditText
     private lateinit var edtDescription: TextInputEditText
     private lateinit var dropCategory: AutoCompleteTextView
@@ -89,6 +108,7 @@ class EventFormActivity : AppCompatActivity() {
     private val eventRepository = EventRepository()
     private lateinit var geocoder: AddressGeocoder
     private lateinit var mapPicker: MapPointPicker
+    private lateinit var compressor: ImageCompressor
 
     private lateinit var uid: String
 
@@ -114,6 +134,14 @@ class EventFormActivity : AppCompatActivity() {
     // o organizador tirou o ponto de propósito: o Salvar não procura o endereço de novo
     private var pointCleared = false
 
+    // o que acontece com a imagem ao salvar: manter, trocar pelos bytes novos ou remover
+    private var imageChange: EventImageChange = EventImageChange.Keep
+
+    // Photo Picker do Android: abre a galeria só com imagens e não pede permissão de armazenamento
+    private val pickImage = registerForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        uri?.let { compressImage(it) }
+    }
+
     private val brazil = Locale.forLanguageTag("pt-BR")
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -126,6 +154,11 @@ class EventFormActivity : AppCompatActivity() {
         toolbar = findViewById(R.id.toolbar)
         scrollContent = findViewById(R.id.scrollContent)
         progressBar = findViewById(R.id.progressBar)
+        imgCover = findViewById(R.id.imgCover)
+        txtNoImage = findViewById(R.id.txtNoImage)
+        progressImage = findViewById(R.id.progressImage)
+        btnPickImage = findViewById(R.id.btnPickImage)
+        btnRemoveImage = findViewById(R.id.btnRemoveImage)
         edtTitle = findViewById(R.id.edtTitle)
         edtDescription = findViewById(R.id.edtDescription)
         dropCategory = findViewById(R.id.dropCategory)
@@ -143,6 +176,7 @@ class EventFormActivity : AppCompatActivity() {
 
         geocoder = AddressGeocoder(this)
         mapPicker = MapPointPicker(mapView) { point -> showMapPoint(point) }
+        compressor = ImageCompressor(this)
         uid = authRepository.requireUserId()
         eventId = intent.getStringExtra(EXTRA_EVENT_ID)
         if (eventId != null) toolbar.setTitle(R.string.edit_event)
@@ -156,6 +190,10 @@ class EventFormActivity : AppCompatActivity() {
 
         edtDate.setOnClickListener { pickDate() }
         edtTime.setOnClickListener { pickTime() }
+        btnPickImage.setOnClickListener {
+            pickImage.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+        }
+        btnRemoveImage.setOnClickListener { removeImage() }
         btnFindOnMap.setOnClickListener { findOnMap() }
         btnClearPoint.setOnClickListener {
             pointCleared = true
@@ -168,6 +206,7 @@ class EventFormActivity : AppCompatActivity() {
             hour = savedInstanceState.getInt(STATE_HOUR, hour)
             minute = savedInstanceState.getInt(STATE_MINUTE, minute)
             restoredState = true
+            imageChange = restoreImageChange(savedInstanceState.getString(STATE_IMAGE))
             pointCleared = savedInstanceState.getBoolean(STATE_POINT_CLEARED)
             if (savedInstanceState.containsKey(STATE_LATITUDE)) {
                 restoredPoint = GeoPoint(
@@ -177,6 +216,8 @@ class EventFormActivity : AppCompatActivity() {
             }
         }
 
+        // formulário aberto do zero: uma imagem esquecida de uma edição abandonada é apagada
+        if (savedInstanceState == null) pendingImageFile().delete()
         loadData(fillFields = savedInstanceState == null)
     }
 
@@ -186,6 +227,11 @@ class EventFormActivity : AppCompatActivity() {
         outState.putInt(STATE_HOUR, hour)
         outState.putInt(STATE_MINUTE, minute)
         outState.putBoolean(STATE_POINT_CLEARED, pointCleared)
+        outState.putString(STATE_IMAGE, when (imageChange) {
+            EventImageChange.Keep -> "keep"
+            is EventImageChange.Replace -> "replace"
+            EventImageChange.Remove -> "remove"
+        })
         // antes do mapa ser montado, guarda de novo o que veio da rotação anterior
         val point = if (mapReady) mapPicker.point else restoredPoint
         point?.let {
@@ -236,6 +282,7 @@ class EventFormActivity : AppCompatActivity() {
                 mapPicker.start(if (restoredState) restoredPoint else event?.coordinates)
                 mapReady = true
                 showMapPoint(mapPicker.point)
+                showImage()
 
                 progressBar.visibility = View.GONE
                 scrollContent.visibility = View.VISIBLE
@@ -302,6 +349,70 @@ class EventFormActivity : AppCompatActivity() {
     }
 
     private fun selectedDate(): Date? = pickerDay?.let { EventDateTime.combine(it, hour, minute) }
+
+    // ---------- imagem de capa ----------
+
+    // reduz e comprime a foto escolhida fora da thread da tela; o resultado só é gravado no Salvar
+    private fun compressImage(uri: Uri) {
+        setImageBusy(true)
+        compressor.compress(uri)
+            .addOnSuccessListener { jpeg ->
+                pendingImageFile().writeBytes(jpeg)
+                imageChange = EventImageChange.Replace(jpeg)
+                setImageBusy(false)
+                showImage()
+            }
+            .addOnFailureListener {
+                setImageBusy(false)
+                Toast.makeText(this, R.string.image_error, Toast.LENGTH_LONG).show()
+            }
+    }
+
+    // tirar a imagem: o evento salvo perde a capa; uma imagem só escolhida (não salva) é descartada
+    private fun removeImage() {
+        pendingImageFile().delete()
+        imageChange = if (original?.withImage() == true) EventImageChange.Remove else EventImageChange.Keep
+        showImage()
+    }
+
+    // mostra a imagem nova, a salva no evento ou o aviso de "nenhuma imagem"
+    private fun showImage() {
+        val change = imageChange
+        val saved = original
+        val hasImage = when (change) {
+            is EventImageChange.Replace -> {
+                EventImages.load(imgCover, change.jpeg)
+                true
+            }
+            EventImageChange.Keep -> saved?.withImage() == true && run {
+                EventImages.show(imgCover, saved)
+                true
+            }
+            EventImageChange.Remove -> false
+        }
+        imgCover.visibility = if (hasImage) View.VISIBLE else View.GONE
+        txtNoImage.visibility = if (hasImage) View.GONE else View.VISIBLE
+        btnRemoveImage.visibility = if (hasImage) View.VISIBLE else View.GONE
+        btnPickImage.setText(if (hasImage) R.string.change_image else R.string.pick_image)
+    }
+
+    private fun setImageBusy(busy: Boolean) {
+        progressImage.visibility = if (busy) View.VISIBLE else View.GONE
+        btnPickImage.isEnabled = !busy
+        btnRemoveImage.isEnabled = !busy
+    }
+
+    private fun pendingImageFile() = File(cacheDir, PENDING_IMAGE_FILE)
+
+    // depois de girar a tela: a imagem nova volta do arquivo do cache
+    private fun restoreImageChange(state: String?): EventImageChange = when (state) {
+        "replace" -> pendingImageFile().takeIf { it.exists() }
+            ?.let { EventImageChange.Replace(it.readBytes()) } ?: EventImageChange.Keep
+        "remove" -> EventImageChange.Remove
+        else -> EventImageChange.Keep
+    }
+
+    // ---------- mapa ----------
 
     // botão Localizar no mapa: coordenadas coladas vão direto para o marcador;
     // um endereço é procurado no Geocoder do Android (precisa de internet)
@@ -385,10 +496,11 @@ class EventFormActivity : AppCompatActivity() {
                     openToAll = !switchExclusive.isChecked
                 )
                 val id = eventId
+                val change = imageChange
                 val write: Task<*> = if (id == null) {
-                    eventRepository.create(uid, draft)
+                    eventRepository.create(uid, draft, (change as? EventImageChange.Replace)?.jpeg)
                 } else {
-                    eventRepository.update(id, draft)
+                    eventRepository.update(id, draft, change)
                 }
                 // whenAll repassa a falha da gravação (por exemplo, recusada pelas regras)
                 Tasks.whenAll(write)
@@ -396,6 +508,7 @@ class EventFormActivity : AppCompatActivity() {
             .addOnSuccessListener {
                 val message = if (eventId == null) R.string.event_created else R.string.event_updated
                 Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+                pendingImageFile().delete()
                 // avisa a tela anterior para recarregar o evento
                 setResult(RESULT_OK)
                 finish()
@@ -423,6 +536,8 @@ class EventFormActivity : AppCompatActivity() {
     // evita dois toques no Salvar enquanto o Firestore responde
     private fun setSaving(saving: Boolean) {
         btnSave.isEnabled = !saving
+        btnPickImage.isEnabled = !saving
+        btnRemoveImage.isEnabled = !saving
         progressBar.visibility = if (saving) View.VISIBLE else View.GONE
     }
 }

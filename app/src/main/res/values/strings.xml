@@ -141,6 +141,12 @@
     <string name="event_location_hint">Sala, auditório ou laboratório</string>
     <string name="event_address">Endereço</string>
     <string name="event_address_hint">Ou cole as coordenadas (latitude, longitude)</string>
+    <string name="event_image">Imagem do evento</string>
+    <string name="no_event_image">Nenhuma imagem escolhida</string>
+    <string name="pick_image">Escolher imagem</string>
+    <string name="change_image">Trocar imagem</string>
+    <string name="remove_image">Remover</string>
+    <string name="image_error">Não foi possível usar essa imagem</string>
     <string name="find_on_map">Localizar no mapa</string>
     <string name="map_point">Ponto no mapa</string>
     <string name="map_point_hint">Toque no mapa ou arraste o marcador até o local exato</string>

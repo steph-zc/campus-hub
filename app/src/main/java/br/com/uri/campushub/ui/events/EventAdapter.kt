@@ -3,12 +3,15 @@ package br.com.uri.campushub.ui.events
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.ImageView
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 import br.com.uri.campushub.R
 import br.com.uri.campushub.data.model.Event
+import br.com.uri.campushub.ui.common.EventImages
 import com.google.android.material.chip.Chip
 
+// cards dos eventos (lista, Meus eventos e Eventos que organizo), com a capa buscada pelo EventImages;
 // onClick recebe o evento tocado, quem decide o que fazer é a tela
 class EventAdapter(
     private val events: List<Event>,
@@ -17,6 +20,7 @@ class EventAdapter(
 
     // guarda as views de um item para não precisar procurar de novo a cada rolagem
     class EventViewHolder(view: View) : RecyclerView.ViewHolder(view) {
+        val imgCover: ImageView = view.findViewById(R.id.imgCover)
         val txtDay: TextView = view.findViewById(R.id.txtDay)
         val txtMonth: TextView = view.findViewById(R.id.txtMonth)
         val dateBadge: View = view.findViewById(R.id.dateBadge)
@@ -38,6 +42,8 @@ class EventAdapter(
         val event = events[position]
         val context = holder.itemView.context
 
+        // capa do evento no topo do card; sem imagem o card fica como antes
+        EventImages.show(holder.imgCover, event)
         holder.txtDay.text = event.day()
         holder.txtMonth.text = event.shortMonth()
         holder.txtCategory.text = event.category

@@ -2,11 +2,13 @@ package br.com.uri.campushub.rules
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import br.com.uri.campushub.data.model.Event
+import br.com.uri.campushub.data.model.EventImageChange
 import br.com.uri.campushub.data.model.MediaPost
 import br.com.uri.campushub.data.model.Role
 import br.com.uri.campushub.data.model.User
 import br.com.uri.campushub.data.repository.CommentRepository
 import br.com.uri.campushub.data.repository.EnrollmentRepository
+import br.com.uri.campushub.data.repository.EventImageRepository
 import br.com.uri.campushub.data.repository.EventRepository
 import br.com.uri.campushub.data.repository.FavoriteRepository
 import br.com.uri.campushub.data.repository.MediaRepository
@@ -26,7 +28,10 @@ import br.com.uri.campushub.testing.FirebaseEmulator
 import br.com.uri.campushub.testing.assertPermissionDenied
 import br.com.uri.campushub.testing.await
 import com.google.firebase.firestore.FieldValue
+import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertNull
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -62,6 +67,7 @@ class FirestoreRulesTest {
     private val comments = CommentRepository(db)
     private val ratings = RatingRepository(db)
     private val media = MediaRepository(db)
+    private val images = EventImageRepository(db)
 
     private lateinit var anaUid: String
     private lateinit var betoUid: String
@@ -162,6 +168,43 @@ class FirestoreRulesTest {
         events.update(id, eventDraft(capacity = 1)).assertPermissionDenied()
         events.update(id, eventDraft(capacity = 3)).await()
         assertEquals(1, events.get(id).await()?.remainingSpots())
+    }
+
+    // a capa vai junto com o evento: imageVersion e eventImages/{id} sempre batem,
+    // só o dono troca ou remove, e a imagem respeita o limite de tamanho
+    @Test
+    fun eventImageGoesWithTheEventAndOnlyItsOwnerChangesIt() {
+        val caioUid = createOrganizer(CAIO_EMAIL, "Caio", "Direito")
+        val first = byteArrayOf(1, 2, 3)
+        val id = events.create(caioUid, eventDraft(), first).await()
+        val firstVersion = events.get(id).await()!!.imageVersion
+        assertArrayEquals(first, images.read(id).await())
+
+        // trocar gera outra versão; remover volta para 0 e apaga os bytes
+        events.update(id, eventDraft(), EventImageChange.Replace(byteArrayOf(4, 5))).await()
+        assertNotEquals(firstVersion, events.get(id).await()!!.imageVersion)
+        assertArrayEquals(byteArrayOf(4, 5), images.read(id).await())
+        events.update(id, eventDraft(), EventImageChange.Remove).await()
+        assertEquals(0L, events.get(id).await()!!.imageVersion)
+        assertNull(images.read(id).await())
+
+        // evento apontando para uma imagem que não existe, ou imagem sem mudar o evento
+        db.collection("events").document(id).update("imageVersion", 99L).assertPermissionDenied()
+        images.document(id).set(EventImageRepository.fields(first, 99L)).assertPermissionDenied()
+
+        // imagem maior que o limite do documento
+        val tooBig = ByteArray(EventImageRepository.MAX_BYTES + 1)
+        events.update(id, eventDraft(), EventImageChange.Replace(tooBig)).assertPermissionDenied()
+
+        // apagar a imagem deixando o evento com a versão antiga
+        events.update(id, eventDraft(), EventImageChange.Replace(first)).await()
+        images.document(id).delete().assertPermissionDenied()
+
+        // qualquer aluno vê a capa, mas não troca nem remove a de outro dono
+        signIn(ANA_EMAIL)
+        assertArrayEquals(first, images.read(id).await())
+        events.update(id, eventDraft(), EventImageChange.Replace(byteArrayOf(7))).assertPermissionDenied()
+        events.update(id, eventDraft(), EventImageChange.Remove).assertPermissionDenied()
     }
 
     // ---------- inscrições ----------

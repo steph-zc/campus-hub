@@ -6,6 +6,7 @@ import android.view.Menu
 import android.view.MenuItem
 import android.view.View
 import android.view.inputmethod.InputMethodManager
+import android.widget.ImageView
 import android.widget.ProgressBar
 import android.widget.RatingBar
 import android.widget.TextView
@@ -29,6 +30,7 @@ import br.com.uri.campushub.data.repository.UserRepository
 import br.com.uri.campushub.domain.EnrollmentRules
 import br.com.uri.campushub.domain.OrganizerRules
 import br.com.uri.campushub.domain.RatingRules
+import br.com.uri.campushub.ui.common.EventImages
 import br.com.uri.campushub.ui.common.applySystemBarsPadding
 import br.com.uri.campushub.ui.common.setupToolbar
 import br.com.uri.campushub.ui.events.EventChips
@@ -58,6 +60,7 @@ class EventDetailsActivity : AppCompatActivity() {
     private lateinit var chipCourse: Chip
     private lateinit var chipAccess: Chip
     private lateinit var txtCategory: TextView
+    private lateinit var imgCover: ImageView
     private lateinit var txtTitle: TextView
     private lateinit var txtDate: TextView
     private lateinit var txtTime: TextView
@@ -119,6 +122,7 @@ class EventDetailsActivity : AppCompatActivity() {
         chipCourse = findViewById(R.id.chipCourse)
         chipAccess = findViewById(R.id.chipAccess)
         txtCategory = findViewById(R.id.txtCategory)
+        imgCover = findViewById(R.id.imgCover)
         txtTitle = findViewById(R.id.txtTitle)
         txtDate = findViewById(R.id.txtDate)
         txtTime = findViewById(R.id.txtTime)
@@ -267,6 +271,8 @@ class EventDetailsActivity : AppCompatActivity() {
     }
 
     private fun showEvent(event: Event, userCourse: String, isEnrolled: Boolean) {
+        // capa do evento (coleção eventImages, pelo EventImages); some se o evento não tem imagem
+        EventImages.show(imgCover, event)
         EventChips.bind(chipCourse, chipAccess, event)
         txtCategory.text = event.category
         txtCategory.visibility = if (event.category.isEmpty()) View.GONE else View.VISIBLE

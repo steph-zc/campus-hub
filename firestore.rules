@@ -51,6 +51,10 @@ service cloud.firestore {
       return /databases/$(database)/documents/events/$(eventId);
     }
 
+    function imagePath(eventId) {
+      return /databases/$(database)/documents/eventImages/$(eventId);
+    }
+
     function enrollmentPath(uid, eventId) {
       return /databases/$(database)/documents/users/$(uid)/enrollments/$(eventId);
     }
@@ -138,6 +142,31 @@ service cloud.firestore {
       }
     }
 
+    // ---------- imagens de capa: eventImages/{eventId} ----------
+
+    // um documento por evento com o JPEG (jpeg, bytes) e a versão (version).
+    // Só o organizador dono grava, e sempre no mesmo lote que muda o imageVersion do evento
+    // para a mesma versão (getAfter = como o evento fica depois do lote)
+    match /eventImages/{eventId} {
+      allow read: if signedIn();
+
+      // 500000 bytes: o mesmo limite do EventImageRepository.MAX_BYTES no app
+      allow create, update: if isOrganizer()
+        && getAfter(eventPath(eventId)).data.get('organizerId', '') == request.auth.uid
+        && hasExactly(['jpeg', 'version'])
+        && data().jpeg is bytes
+        && data().jpeg.size() > 0
+        && data().jpeg.size() <= 500000
+        && data().version is int
+        && data().version > 0
+        && getAfter(eventPath(eventId)).data.imageVersion == data().version;
+
+      // remover a capa: o evento volta para imageVersion 0 no mesmo lote
+      allow delete: if isOrganizer()
+        && get(eventPath(eventId)).data.get('organizerId', '') == request.auth.uid
+        && getAfter(eventPath(eventId)).data.get('imageVersion', 0) == 0;
+    }
+
     // ---------- eventos: events/{eventId} ----------
 
     // aluno comum só mexe no contador de inscritos, e só junto com a própria inscrição:
@@ -177,25 +206,39 @@ service cloud.firestore {
         && data().openToAll is bool;
     }
 
+    // imageVersion do evento bate com eventImages/{eventId} depois da gravação (getAfter/existsAfter):
+    // 0 = sem imagem e sem documento; > 0 = o documento existe com a mesma versão.
+    // Assim o evento nunca aponta para uma imagem que não existe (o app grava os dois no mesmo lote)
+    function hasMatchingImage(eventId) {
+      let version = data().get('imageVersion', 0);
+      let image = imagePath(eventId);
+      return version is int
+        && ((version == 0 && !existsAfter(image))
+            || (version > 0 && existsAfter(image) && getAfter(image).data.version == version));
+    }
+
     // organizador cria evento próprio: ele é o dono, começa sem inscritos e acontece no futuro
-    function isOwnEventCreate() {
+    function isOwnEventCreate(eventId) {
       return isOrganizer()
-        && hasExactly(eventFormFields().concat(['organizerId', 'enrolledCount']))
+        && hasExactly(eventFormFields().concat(['organizerId', 'enrolledCount', 'imageVersion']))
         && data().organizerId == request.auth.uid
         && data().enrolledCount == 0
         && data().date > request.time
-        && isValidEventForm();
+        && isValidEventForm()
+        && hasMatchingImage(eventId);
     }
 
-    // organizador edita só o evento dele e só os campos do formulário (dono e inscritos não mudam);
-    // a capacidade não fica abaixo dos inscritos e a data, se mudar, vai para o futuro
-    function isOwnEventEdit() {
+    // organizador edita só o evento dele, só os campos do formulário e a versão da imagem
+    // (dono e inscritos não mudam); a capacidade não fica abaixo dos inscritos e a data,
+    // se mudar, vai para o futuro
+    function isOwnEventEdit(eventId) {
       return isOrganizer()
         && resource.data.get('organizerId', '') == request.auth.uid
-        && changesOnly(eventFormFields())
+        && changesOnly(eventFormFields().concat(['imageVersion']))
         && isValidEventForm()
         && data().capacity >= resource.data.enrolledCount
-        && (data().date == resource.data.date || data().date > request.time);
+        && (data().date == resource.data.date || data().date > request.time)
+        && hasMatchingImage(eventId);
     }
 
     match /events/{eventId} {
@@ -203,9 +246,9 @@ service cloud.firestore {
 
       // admin grava os eventos de exemplo; organizador cria e edita os próprios.
       // Excluir continua só com o admin: o organizador encerra o evento em vez de apagá-lo
-      allow create: if isAdmin() || isOwnEventCreate();
+      allow create: if isAdmin() || isOwnEventCreate(eventId);
       allow delete: if isAdmin();
-      allow update: if isAdmin() || isEnrollmentCount(eventId) || isOwnEventEdit();
+      allow update: if isAdmin() || isEnrollmentCount(eventId) || isOwnEventEdit(eventId);
 
       // ---------- comentários: events/{eventId}/comments/{commentId} ----------
 
