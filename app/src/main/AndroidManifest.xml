@@ -52,6 +52,12 @@
             android:name=".ui.organizer.OrganizerEventsActivity"
             android:theme="@style/Theme.CampusHub.NoActionBar" />
 
+        <!-- formulário de criar e editar evento do organizador -->
+        <activity
+            android:name=".ui.organizer.EventFormActivity"
+            android:theme="@style/Theme.CampusHub.NoActionBar"
+            android:windowSoftInputMode="adjustResize" />
+
         <activity
             android:name=".ui.profile.ProfileActivity"
             android:theme="@style/Theme.CampusHub.NoActionBar"

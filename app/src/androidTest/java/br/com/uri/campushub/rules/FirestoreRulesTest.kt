@@ -17,6 +17,7 @@ import br.com.uri.campushub.testing.EmulatorData.createAdmin
 import br.com.uri.campushub.testing.EmulatorData.createOrganizer
 import br.com.uri.campushub.testing.EmulatorData.createStudent
 import br.com.uri.campushub.testing.EmulatorData.daysFromNow
+import br.com.uri.campushub.testing.EmulatorData.eventDraft
 import br.com.uri.campushub.testing.EmulatorData.moveEventDate
 import br.com.uri.campushub.testing.EmulatorData.saveEvents
 import br.com.uri.campushub.testing.EmulatorData.signIn
@@ -115,6 +116,52 @@ class FirestoreRulesTest {
             .assertPermissionDenied()
         db.collection("events").document(OPEN).update("title", "Outro título").assertPermissionDenied()
         events.saveSampleEvents().assertPermissionDenied()
+    }
+
+    // organizador cria e edita só os próprios eventos, com os campos e limites do formulário
+    @Test
+    fun organizerCreatesAndEditsOnlyTheirOwnEvents() {
+        val caioUid = createOrganizer(CAIO_EMAIL, "Caio", "Direito")
+        val id = events.create(caioUid, eventDraft()).await()
+        events.update(id, eventDraft(title = "Hackathon 2026", capacity = 40)).await()
+        assertEquals("Hackathon 2026", events.get(id).await()?.title)
+
+        // em nome de outro dono, já com inscritos ou com data passada
+        val forged = eventDraft().toMap()
+        db.collection("events").document().set(forged + mapOf("organizerId" to anaUid, "enrolledCount" to 0))
+            .assertPermissionDenied()
+        db.collection("events").document().set(forged + mapOf("organizerId" to caioUid, "enrolledCount" to 5))
+            .assertPermissionDenied()
+        events.create(caioUid, eventDraft(days = -1)).assertPermissionDenied()
+
+        // a edição não troca o dono nem o contador, e não mexe nos eventos do admin
+        db.collection("events").document(id).update("organizerId", anaUid).assertPermissionDenied()
+        db.collection("events").document(id).update("enrolledCount", 3).assertPermissionDenied()
+        events.update(OPEN, eventDraft()).assertPermissionDenied()
+
+        // aluno comum não cria evento
+        signIn(ANA_EMAIL)
+        events.create(anaUid, eventDraft()).assertPermissionDenied()
+    }
+
+    // os limites do formulário valem no servidor, e a capacidade não fica abaixo dos inscritos
+    @Test
+    fun eventFormLimitsAndCapacityAreCheckedByTheRules() {
+        val caioUid = createOrganizer(CAIO_EMAIL, "Caio", "Direito")
+        events.create(caioUid, eventDraft(title = "")).assertPermissionDenied()
+        events.create(caioUid, eventDraft(capacity = 0)).assertPermissionDenied()
+        events.create(caioUid, eventDraft(capacity = 5001)).assertPermissionDenied()
+        val id = events.create(caioUid, eventDraft(capacity = 2)).await()
+
+        signIn(ANA_EMAIL)
+        enrollments.enroll(anaUid, id).await()
+        signIn(BETO_EMAIL)
+        enrollments.enroll(betoUid, id).await()
+
+        signIn(CAIO_EMAIL)
+        events.update(id, eventDraft(capacity = 1)).assertPermissionDenied()
+        events.update(id, eventDraft(capacity = 3)).await()
+        assertEquals(1, events.get(id).await()?.remainingSpots())
     }
 
     // ---------- inscrições ----------

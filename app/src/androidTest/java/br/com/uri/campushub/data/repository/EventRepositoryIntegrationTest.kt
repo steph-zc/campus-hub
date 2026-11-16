@@ -7,6 +7,7 @@ import br.com.uri.campushub.testing.EmulatorData.createAdmin
 import br.com.uri.campushub.testing.EmulatorData.createOrganizer
 import br.com.uri.campushub.testing.EmulatorData.createStudent
 import br.com.uri.campushub.testing.EmulatorData.daysFromNow
+import br.com.uri.campushub.testing.EmulatorData.eventDraft
 import br.com.uri.campushub.testing.EmulatorData.saveEvents
 import br.com.uri.campushub.testing.EmulatorData.signIn
 import br.com.uri.campushub.testing.FirebaseEmulator
@@ -82,6 +83,26 @@ class EventRepositoryIntegrationTest {
         signIn("caio@campushub.test")
 
         assertEquals(listOf("Antes", "Depois"), events.getByOrganizer(caioUid).await().map { it.title })
+    }
+
+    // o formulário do organizador vira um evento dele, sem inscritos; a edição troca só o formulário
+    @Test
+    fun organizerCreatesAndEditsTheirEvent() {
+        val caioUid = createOrganizer("caio@campushub.test", "Caio", "Direito")
+
+        val id = events.create(caioUid, eventDraft(title = "Hackathon", capacity = 30, openToAll = false)).await()
+        val created = events.get(id).await()!!
+        assertEquals(caioUid, created.organizerId)
+        assertEquals(0, created.enrolledCount)
+        assertEquals("Direito", created.course)
+        assertEquals(false, created.openToAll)
+
+        events.update(id, eventDraft(title = "Hackathon 2026", capacity = 45)).await()
+        val edited = events.get(id).await()!!
+        assertEquals("Hackathon 2026", edited.title)
+        assertEquals(45, edited.capacity)
+        assertEquals(caioUid, edited.organizerId)
+        assertEquals(listOf(id), events.getByOrganizer(caioUid).await().map { it.id })
     }
 
     // primeira execução na conta admin: grava os 12 exemplos; a sincronização devolve

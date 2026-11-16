@@ -2,6 +2,7 @@ package br.com.uri.campushub.data.repository
 
 import br.com.uri.campushub.data.SampleEvents
 import br.com.uri.campushub.data.model.Event
+import br.com.uri.campushub.data.model.EventDraft
 import com.google.android.gms.tasks.Task
 import com.google.android.gms.tasks.Tasks
 import com.google.firebase.firestore.FieldPath
@@ -9,11 +10,12 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.firestore.QuerySnapshot
 
-// leitura dos eventos na coleção "events" (a gravação é só da conta admin)
+// eventos na coleção "events": leitura para todos os logados; gravação pelo organizador
+// responsável (create/update) e pela conta admin (eventos de exemplo)
 class EventRepository(private val db: FirebaseFirestore = FirebaseFirestore.getInstance()) {
 
     companion object {
-        // as regras do Firestore (firestore.rules) só deixam a conta admin gravar eventos;
+        // as regras do Firestore (firestore.rules) só deixam a conta admin gravar os eventos de exemplo;
         // para os outros alunos a gravação dos exemplos volta com esse erro
         fun isPermissionDenied(error: Exception) =
             (error as? FirebaseFirestoreException)?.code == FirebaseFirestoreException.Code.PERMISSION_DENIED
@@ -50,6 +52,23 @@ class EventRepository(private val db: FirebaseFirestore = FirebaseFirestore.getI
     fun getByOrganizer(organizerId: String): Task<List<Event>> =
         events.whereEqualTo("organizerId", organizerId).get()
             .continueWith { task -> task.result.toObjects(Event::class.java).sortedBy { it.date } }
+
+    // novo evento do organizador: os campos do formulário mais o dono e o contador zerado.
+    // O id é gerado pelo Firestore (document() sem nome) e devolvido para a tela.
+    // As regras só aceitam se a conta tiver organizers/{uid} e o organizerId for o dela
+    fun create(organizerId: String, draft: EventDraft): Task<String> {
+        val doc = events.document()
+        val data = draft.toMap() + mapOf("organizerId" to organizerId, "enrolledCount" to 0)
+        return doc.set(data).continueWith { task ->
+            task.result
+            doc.id
+        }
+    }
+
+    // edição pelo organizador responsável: troca só os campos do formulário;
+    // dono e inscritos continuam como estão (as regras recusam se mudarem)
+    fun update(eventId: String, draft: EventDraft): Task<Void> =
+        events.document(eventId).update(draft.toMap())
 
     // grava os eventos de exemplo; a tela chama quando a coleção está vazia (só a conta admin consegue)
     fun saveSampleEvents(): Task<Void> = SampleEvents.save(db)

@@ -19,6 +19,7 @@ import br.com.uri.campushub.ui.details.EventDetailsActivity
 import br.com.uri.campushub.ui.events.EventAdapter
 import com.google.android.material.appbar.AppBarLayout
 import com.google.android.material.appbar.MaterialToolbar
+import com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
 
 // área do organizador: os eventos sob a responsabilidade da conta logada.
 // Só é aberta pelo menu da lista de eventos quando o UserRepository diz que a conta é organizadora;
@@ -49,6 +50,11 @@ class OrganizerEventsActivity : AppCompatActivity() {
         setupToolbar(toolbar)
         rvEvents.layoutManager = LinearLayoutManager(this)
         applySystemBarsPadding(findViewById(R.id.root), appBar, rvEvents)
+
+        // formulário em branco; a lista recarrega no onResume quando ele fecha
+        findViewById<ExtendedFloatingActionButton>(R.id.fabNewEvent).setOnClickListener {
+            startActivity(Intent(this, EventFormActivity::class.java))
+        }
     }
 
     // recarrega ao voltar dos detalhes: as vagas ocupadas mudam com as inscrições
@@ -70,7 +76,7 @@ class OrganizerEventsActivity : AppCompatActivity() {
         layoutEmpty.visibility = if (events.isEmpty()) View.VISIBLE else View.GONE
     }
 
-    // por enquanto abre os mesmos detalhes que o aluno vê; o painel do organizador vem depois
+    // abre os detalhes; para o dono, a barra dos detalhes tem a opção "Editar evento"
     private fun openDetails(event: Event) {
         val intent = Intent(this, EventDetailsActivity::class.java)
         intent.putExtra(EventDetailsActivity.EXTRA_EVENT_ID, event.id)

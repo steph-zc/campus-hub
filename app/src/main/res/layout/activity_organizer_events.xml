@@ -74,4 +74,14 @@
         android:layout_height="wrap_content"
         android:layout_gravity="center" />
 
+    <!-- abre o formulário em branco (EventFormActivity) -->
+    <com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
+        android:id="@+id/fabNewEvent"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|end"
+        android:layout_margin="16dp"
+        android:text="@string/new_event"
+        app:icon="@drawable/ic_add" />
+
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

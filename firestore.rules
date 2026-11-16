@@ -24,6 +24,11 @@ service cloud.firestore {
       return signedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
     }
 
+    // organizador = existe organizers/{uid}; também só é criado pelo console do Firebase
+    function isOrganizer() {
+      return signedIn() && exists(/databases/$(database)/documents/organizers/$(request.auth.uid));
+    }
+
     function data() {
       return request.resource.data;
     }
@@ -64,7 +69,7 @@ service cloud.firestore {
 
     // ---------- organizadores ----------
 
-    // organizers/{uid} marca a conta como organizadora; é criado só pelo console do Firebase.
+    // organizers/{uid} marca a conta como organizadora (isOrganizer); é criado só pelo console do Firebase.
     // Cada conta lê apenas o próprio documento (o app descobre o papel) e ninguém grava pelo app,
     // então um aluno não consegue se promover nem descobrir quem são os outros organizadores
     match /organizers/{uid} {
@@ -152,12 +157,55 @@ service cloud.firestore {
               && !existsAfter(enrollment)));
     }
 
+    // campos que o organizador preenche no formulário (EventDraft no app)
+    function eventFormFields() {
+      return ['title', 'description', 'category', 'date', 'location', 'address',
+              'coordinates', 'capacity', 'course', 'openToAll'];
+    }
+
+    // mesmos limites do EventFormValidator do app
+    function isValidEventForm() {
+      return isText(data().title, 100)
+        && isText(data().description, 2000)
+        && isText(data().category, 50)
+        && data().date is timestamp
+        && data().location is string && data().location.size() <= 100
+        && isText(data().address, 200)
+        && (data().coordinates == null || data().coordinates is latlng)
+        && data().capacity is int && data().capacity >= 1 && data().capacity <= 5000
+        && isText(data().course, 100)
+        && data().openToAll is bool;
+    }
+
+    // organizador cria evento próprio: ele é o dono, começa sem inscritos e acontece no futuro
+    function isOwnEventCreate() {
+      return isOrganizer()
+        && hasExactly(eventFormFields().concat(['organizerId', 'enrolledCount']))
+        && data().organizerId == request.auth.uid
+        && data().enrolledCount == 0
+        && data().date > request.time
+        && isValidEventForm();
+    }
+
+    // organizador edita só o evento dele e só os campos do formulário (dono e inscritos não mudam);
+    // a capacidade não fica abaixo dos inscritos e a data, se mudar, vai para o futuro
+    function isOwnEventEdit() {
+      return isOrganizer()
+        && resource.data.get('organizerId', '') == request.auth.uid
+        && changesOnly(eventFormFields())
+        && isValidEventForm()
+        && data().capacity >= resource.data.enrolledCount
+        && (data().date == resource.data.date || data().date > request.time);
+    }
+
     match /events/{eventId} {
       allow read: if signedIn();
 
-      // eventos são criados e editados só pela conta admin (eventos de exemplo e locais)
-      allow create, delete: if isAdmin();
-      allow update: if isAdmin() || isEnrollmentCount(eventId);
+      // admin grava os eventos de exemplo; organizador cria e edita os próprios.
+      // Excluir continua só com o admin: o organizador encerra o evento em vez de apagá-lo
+      allow create: if isAdmin() || isOwnEventCreate();
+      allow delete: if isAdmin();
+      allow update: if isAdmin() || isEnrollmentCount(eventId) || isOwnEventEdit();
 
       // ---------- comentários: events/{eventId}/comments/{commentId} ----------
 

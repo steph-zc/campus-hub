@@ -38,7 +38,8 @@ object TestEvents {
         enrolledCount: Int = 0,
         course: String = "Ciência da Computação",
         openToAll: Boolean = true,
-        category: String = "Palestra"
+        category: String = "Palestra",
+        organizerId: String = ""
     ) = Event(
         id = id,
         title = title,
@@ -47,6 +48,7 @@ object TestEvents {
         enrolledCount = enrolledCount,
         course = course,
         openToAll = openToAll,
-        category = category
+        category = category,
+        organizerId = organizerId
     )
 }

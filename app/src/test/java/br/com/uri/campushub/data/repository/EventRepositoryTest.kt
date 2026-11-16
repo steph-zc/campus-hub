@@ -1,9 +1,14 @@
 package br.com.uri.campushub.data.repository
 
 import br.com.uri.campushub.data.model.Event
+import br.com.uri.campushub.data.model.EventDraft
+import br.com.uri.campushub.testing.TestEvents
 import br.com.uri.campushub.testing.TestEvents.event
 import br.com.uri.campushub.testing.await
 import com.google.android.gms.tasks.Tasks
+import com.google.firebase.Timestamp
+import com.google.firebase.firestore.GeoPoint
+import io.mockk.slot
 import com.google.firebase.firestore.CollectionReference
 import com.google.firebase.firestore.DocumentReference
 import com.google.firebase.firestore.DocumentSnapshot
@@ -109,6 +114,47 @@ class EventRepositoryTest {
         // ordenados por data: o evento 31 (daqui a 9 dias) vem primeiro
         assertEquals("event-31", result.first().id)
         assertEquals("event-1", result.last().id)
+    }
+
+    // formulário preenchido pelo organizador, igual ao que a EventFormActivity monta
+    private val draft = EventDraft(
+        title = "Hackathon",
+        description = "24 horas de programação",
+        category = "Competição",
+        date = Timestamp(TestEvents.daysFromNow(10)),
+        location = "Laboratório 3",
+        address = "Rua Batista Bonoto Sobrinho, 733",
+        coordinates = GeoPoint(-29.19, -54.88),
+        capacity = 60,
+        course = "Ciência da Computação",
+        openToAll = false
+    )
+
+    // o Firestore gera o id; o documento leva o formulário, o dono e o contador zerado
+    @Test
+    fun `new event saves the form with its organizer and no enrollments`() {
+        val doc = mockk<DocumentReference>()
+        val data = slot<Map<String, Any?>>()
+        every { events.document() } returns doc
+        every { doc.id } returns "novo-evento"
+        every { doc.set(capture(data)) } returns Tasks.forResult(null)
+
+        assertEquals("novo-evento", repository.create("uid-caio", draft).await())
+        assertEquals(draft.toMap() + mapOf("organizerId" to "uid-caio", "enrolledCount" to 0), data.captured)
+    }
+
+    // a edição manda só os campos do formulário: organizerId e enrolledCount ficam de fora
+    @Test
+    fun `editing updates only the form fields`() {
+        val doc = mockk<DocumentReference>()
+        every { events.document("event-1") } returns doc
+        every { doc.update(draft.toMap()) } returns Tasks.forResult(null)
+
+        repository.update("event-1", draft).await()
+
+        verify { doc.update(draft.toMap()) }
+        assertFalse(draft.toMap().containsKey("organizerId"))
+        assertFalse(draft.toMap().containsKey("enrolledCount"))
     }
 
     // a consulta filtra pelo dono; a ordem por data é feita no app (sem índice composto)

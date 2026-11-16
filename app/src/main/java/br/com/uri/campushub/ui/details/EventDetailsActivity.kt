@@ -1,5 +1,6 @@
 package br.com.uri.campushub.ui.details
 
+import android.content.Intent
 import android.os.Bundle
 import android.view.Menu
 import android.view.MenuItem
@@ -9,6 +10,7 @@ import android.widget.ProgressBar
 import android.widget.RatingBar
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.widget.NestedScrollView
@@ -25,11 +27,13 @@ import br.com.uri.campushub.data.repository.FavoriteRepository
 import br.com.uri.campushub.data.repository.RatingRepository
 import br.com.uri.campushub.data.repository.UserRepository
 import br.com.uri.campushub.domain.EnrollmentRules
+import br.com.uri.campushub.domain.OrganizerRules
 import br.com.uri.campushub.domain.RatingRules
 import br.com.uri.campushub.ui.common.applySystemBarsPadding
 import br.com.uri.campushub.ui.common.setupToolbar
 import br.com.uri.campushub.ui.events.EventChips
 import br.com.uri.campushub.ui.media.MediaSection
+import br.com.uri.campushub.ui.organizer.EventFormActivity
 import com.google.android.gms.tasks.Tasks
 import com.google.android.material.appbar.AppBarLayout
 import com.google.android.material.appbar.MaterialToolbar
@@ -91,6 +95,14 @@ class EventDetailsActivity : AppCompatActivity() {
 
     // null enquanto os dados não chegaram; o coração só aparece depois
     private var isFavorite: Boolean? = null
+
+    // true quando a conta logada é a organizadora responsável pelo evento
+    private var canEdit = false
+
+    // abre o formulário de edição; se o organizador salvar, os detalhes são lidos de novo
+    private val editEvent = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        if (result.resultCode == RESULT_OK) loadData()
+    }
 
     // nome do aluno logado, gravado como autor dos comentários dele
     private var userName = ""
@@ -177,13 +189,22 @@ class EventDetailsActivity : AppCompatActivity() {
             item.setIcon(R.drawable.ic_favorite_border)
             item.setTitle(R.string.add_favorite)
         }
+        menu.findItem(R.id.menuEditEvent).isVisible = canEdit
         return super.onPrepareOptionsMenu(menu)
     }
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
-        if (item.itemId == R.id.menuFavorite) {
-            toggleFavorite()
-            return true
+        when (item.itemId) {
+            R.id.menuFavorite -> {
+                toggleFavorite()
+                return true
+            }
+            R.id.menuEditEvent -> {
+                val intent = Intent(this, EventFormActivity::class.java)
+                intent.putExtra(EventFormActivity.EXTRA_EVENT_ID, eventId)
+                editEvent.launch(intent)
+                return true
+            }
         }
         return super.onOptionsItemSelected(item)
     }
@@ -207,16 +228,17 @@ class EventDetailsActivity : AppCompatActivity() {
             }
     }
 
-    // busca o evento, o curso do aluno, a inscrição, o favorito e a avaliação ao mesmo tempo
+    // busca o evento, o curso do aluno, a inscrição, o favorito, a avaliação e o papel da conta ao mesmo tempo
     private fun loadData() {
         val eventTask = eventRepository.get(eventId)
         val userTask = userRepository.get(uid)
         val enrolledTask = enrollmentRepository.isEnrolled(uid, eventId)
         val favoriteTask = favoriteRepository.isFavorite(uid, eventId)
         val ratingTask = ratingRepository.getMyRating(uid, eventId)
+        val roleTask = userRepository.getRole(uid)
 
-        // espera as cinco buscas terminarem e depois lê o resultado de cada uma
-        Tasks.whenAllSuccess<Any>(eventTask, userTask, enrolledTask, favoriteTask, ratingTask)
+        // espera as seis buscas terminarem e depois lê o resultado de cada uma
+        Tasks.whenAllSuccess<Any>(eventTask, userTask, enrolledTask, favoriteTask, ratingTask, roleTask)
             .addOnSuccessListener {
                 val event = eventTask.result
                 if (event == null) {
@@ -232,6 +254,7 @@ class EventDetailsActivity : AppCompatActivity() {
                 isFavorite = favoriteTask.result
                 // 0 = ainda não avaliou
                 val myRating = ratingTask.result
+                canEdit = OrganizerRules.canManage(event, uid, roleTask.result)
                 invalidateOptionsMenu()
                 showEvent(event, userCourse, isEnrolled)
                 showRatingState(event, isEnrolled, myRating)

@@ -1,6 +1,7 @@
 package br.com.uri.campushub.testing
 
 import br.com.uri.campushub.data.model.Event
+import br.com.uri.campushub.data.model.EventDraft
 import br.com.uri.campushub.data.model.User
 import br.com.uri.campushub.data.repository.UserRepository
 import com.google.firebase.Timestamp
@@ -62,6 +63,26 @@ object EmulatorData {
         signIn(ADMIN_EMAIL)
         db.collection("events").document(eventId).update("date", date).await()
     }
+
+    // formulário de evento do organizador, como a EventFormActivity monta (sem ponto no mapa)
+    fun eventDraft(
+        title: String = "Hackathon",
+        days: Int = 10,
+        capacity: Int = 30,
+        course: String = "Direito",
+        openToAll: Boolean = true
+    ) = EventDraft(
+        title = title,
+        description = "Maratona de programação no campus",
+        category = "Competição",
+        date = daysFromNow(days),
+        location = "Laboratório 3",
+        address = "Rua Batista Bonoto Sobrinho, 733 - Santiago - RS",
+        coordinates = null,
+        capacity = capacity,
+        course = course,
+        openToAll = openToAll
+    )
 
     fun daysFromNow(days: Int) =
         Timestamp(Date(System.currentTimeMillis() + TimeUnit.DAYS.toMillis(days.toLong())))
