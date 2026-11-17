@@ -492,6 +492,96 @@ class FirestoreRulesTest {
         waitlist.join(anaUid, "uma-vaga").assertPermissionDenied()
     }
 
+    // evento de 1 vaga ocupada pelo Diego, com a Ana (1ª) e o Beto (2º) na fila
+    private fun fullEventWithQueue(): String {
+        signIn(ADMIN_EMAIL)
+        saveEvents(mapOf("uma-vaga" to Event(title = "Uma vaga", date = daysFromNow(7), capacity = 1)))
+        val diegoUid = createStudent("diego@campushub.test", "Diego", "Direito")
+        enrollments.enroll(diegoUid, "uma-vaga").await()
+        signIn(ANA_EMAIL)
+        waitlist.join(anaUid, "uma-vaga").await()
+        signIn(BETO_EMAIL)
+        waitlist.join(betoUid, "uma-vaga").await()
+        return diegoUid
+    }
+
+    // a vaga de quem cancela é do primeiro da fila: ninguém de fora (nem quem cancelou) entra antes,
+    // e o settle inscreve a Ana, não o Beto
+    @Test
+    fun freedSpotGoesToTheFirstInQueueOnly() {
+        val diegoUid = fullEventWithQueue()
+
+        signIn("diego@campushub.test")
+        enrollments.cancel(diegoUid, "uma-vaga").await()
+        enrollmentDoc(diegoUid, "uma-vaga").set(enrollmentData("uma-vaga")).assertPermissionDenied()
+        db.runBatch { batch ->
+            batch.set(enrollmentDoc(diegoUid, "uma-vaga"), enrollmentData("uma-vaga"))
+            batch.update(db.collection("events").document("uma-vaga"), "enrolledCount", FieldValue.increment(1))
+        }.assertPermissionDenied()
+
+        assertEquals(1, waitlist.settle("uma-vaga").await())
+        signIn(ANA_EMAIL)
+        assertTrue(enrollments.isEnrolled(anaUid, "uma-vaga").await())
+        assertEquals(0, waitlist.getPosition(anaUid, "uma-vaga").await())
+        signIn(BETO_EMAIL)
+        assertEquals(1, waitlist.getPosition(betoUid, "uma-vaga").await())
+    }
+
+    // o 2º da fila não consegue se inscrever no lugar da 1ª, nem pular a senha dela
+    @Test
+    fun secondInQueueCannotJumpAhead() {
+        val diegoUid = fullEventWithQueue()
+        signIn("diego@campushub.test")
+        enrollments.cancel(diegoUid, "uma-vaga").await()
+
+        signIn(BETO_EMAIL)
+        val event = db.collection("events").document("uma-vaga")
+        val tickets = event.collection("waitlistTickets")
+        db.runBatch { batch ->
+            batch.set(enrollmentDoc(betoUid, "uma-vaga"), enrollmentData("uma-vaga") + ("fromWaitlist" to true))
+            batch.update(event, mapOf("enrolledCount" to 1, "waitlistHead" to 1))
+            batch.delete(tickets.document("1"))
+            batch.delete(event.collection("waitlist").document(betoUid))
+        }.assertPermissionDenied()
+        // pular a senha 0 só vale se a Ana já tiver saído da fila
+        event.update("waitlistHead", 1).assertPermissionDenied()
+        // e a senha da Ana não pode ser apagada por ele
+        tickets.document("0").delete().assertPermissionDenied()
+    }
+
+    // a Ana sai da fila: a senha dela vira buraco, o settle pula e inscreve o Beto
+    @Test
+    fun whoLeavesIsSkippedAndTheNextGetsTheSpot() {
+        val diegoUid = fullEventWithQueue()
+        signIn(ANA_EMAIL)
+        waitlist.leave(anaUid, "uma-vaga").await()
+        signIn("diego@campushub.test")
+        enrollments.cancel(diegoUid, "uma-vaga").await()
+
+        assertEquals(1, waitlist.settle("uma-vaga").await())
+        signIn(BETO_EMAIL)
+        assertTrue(enrollments.isEnrolled(betoUid, "uma-vaga").await())
+    }
+
+    // o organizador aumenta a capacidade: as vagas novas vão direto para os primeiros da fila
+    @Test
+    fun capacityIncreaseServesTheQueue() {
+        val caioUid = createOrganizer(CAIO_EMAIL, "Caio", "Direito")
+        val id = events.create(caioUid, eventDraft(capacity = 1)).await()
+        events.publish(id).await()
+        val diegoUid = createStudent("diego@campushub.test", "Diego", "Direito")
+        enrollments.enroll(diegoUid, id).await()
+        signIn(ANA_EMAIL)
+        waitlist.join(anaUid, id).await()
+        signIn(BETO_EMAIL)
+        waitlist.join(betoUid, id).await()
+
+        signIn(CAIO_EMAIL)
+        events.update(id, eventDraft(capacity = 3)).await()
+        assertEquals(2, waitlist.settle(id).await())
+        assertEquals(3, events.get(id).await()?.enrolledCount)
+    }
+
     // ---------- comentários ----------
 
     @Test

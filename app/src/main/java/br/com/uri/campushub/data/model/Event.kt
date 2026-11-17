@@ -1,11 +1,10 @@
 package br.com.uri.campushub.data.model
 
+import br.com.uri.campushub.domain.CampusTime
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.DocumentId
 import com.google.firebase.firestore.GeoPoint
-import java.text.SimpleDateFormat
 import java.util.Date
-import java.util.Locale
 
 // os valores padrão permitem que o Firestore monte o objeto sozinho com toObject()
 data class Event(
@@ -34,8 +33,15 @@ data class Event(
     val imageVersion: Long = 0,
     // situação gravada (EventStatus.value): rascunho, publicado, inscrições encerradas ou evento encerrado.
     // O padrão é "published" para os eventos gravados antes do campo existir
-    val status: String = EventStatus.PUBLISHED.value
+    val status: String = EventStatus.PUBLISHED.value,
+    // lista de espera por senhas (WaitlistRepository): a próxima senha a ser entregue
+    // e a próxima a ser atendida. Fila vazia quando as duas são iguais; 0 nos eventos sem fila
+    val waitlistNext: Int = 0,
+    val waitlistHead: Int = 0
 ) {
+    // ainda há senhas esperando; vaga que abrir vai para a fila, não para quem chegar
+    fun hasQueue() = waitlistHead < waitlistNext
+
     // sem "is" nem "get" no nome, para o Firestore não gravar como campo do documento
     fun withImage() = imageVersion > 0
 
@@ -74,7 +80,7 @@ data class Event(
     fun time() = format("HH:mm")
 
     private fun format(pattern: String): String {
-        val format = SimpleDateFormat(pattern, Locale.forLanguageTag("pt-BR"))
-        return date?.let { format.format(it.toDate()) } ?: ""
+        // sempre no fuso do campus (CampusTime), não no do aparelho
+        return date?.let { CampusTime.formatter(pattern).format(it.toDate()) } ?: ""
     }
 }

@@ -29,6 +29,7 @@ import br.com.uri.campushub.data.repository.FavoriteRepository
 import br.com.uri.campushub.data.repository.RatingRepository
 import br.com.uri.campushub.data.repository.UserRepository
 import br.com.uri.campushub.data.repository.WaitlistRepository
+import br.com.uri.campushub.domain.CampusTime
 import br.com.uri.campushub.domain.EnrollmentRules
 import br.com.uri.campushub.domain.OrganizerRules
 import br.com.uri.campushub.domain.RatingRules
@@ -48,7 +49,6 @@ import com.google.android.material.card.MaterialCardView
 import com.google.android.material.chip.Chip
 import com.google.android.material.textfield.TextInputEditText
 import com.google.android.material.textfield.TextInputLayout
-import java.text.SimpleDateFormat
 import java.util.Locale
 import org.osmdroid.views.MapView
 
@@ -267,7 +267,19 @@ class EventDetailsActivity : AppCompatActivity() {
     }
 
     // busca o evento, o curso do aluno, a inscrição, o favorito, a avaliação e o papel da conta ao mesmo tempo
+    // antes de ler, atende a lista de espera se uma vaga abriu (WaitlistRepository.settle):
+    // é aqui que a vaga de quem cancelou vai para o primeiro da fila. Se falhar (por exemplo,
+    // um rascunho que o aluno não pode ver), a tela carrega do mesmo jeito
     private fun loadData() {
+        waitlistRepository.settle(eventId).addOnCompleteListener { loadDetails() }
+    }
+
+    // a tela já foi fechada (voltar, sair da conta, trocar de conta) enquanto o Firestore respondia:
+    // a resposta é ignorada, porque desenhar numa Activity destruída derruba o app (o Glide recusa)
+    private fun isGone() = isFinishing || isDestroyed
+
+    private fun loadDetails() {
+        if (isGone()) return
         val eventTask = eventRepository.get(eventId)
         val userTask = userRepository.get(uid)
         val enrolledTask = enrollmentRepository.isEnrolled(uid, eventId)
@@ -276,10 +288,15 @@ class EventDetailsActivity : AppCompatActivity() {
         val roleTask = userRepository.getRole(uid)
         // posição na lista de espera (WaitlistRepository, agregação count no Firestore); 0 = fora da fila
         val waitlistTask = waitlistRepository.getPosition(uid, eventId)
+        // true uma vez só, quando a inscrição veio da lista de espera (EnrollmentRepository)
+        val promotedTask = enrollmentRepository.takePromotionNotice(uid, eventId)
 
-        // espera as sete buscas terminarem e depois lê o resultado de cada uma
-        Tasks.whenAllSuccess<Any>(eventTask, userTask, enrolledTask, favoriteTask, ratingTask, roleTask, waitlistTask)
+        // espera as oito buscas terminarem e depois lê o resultado de cada uma
+        Tasks.whenAllSuccess<Any>(
+            eventTask, userTask, enrolledTask, favoriteTask, ratingTask, roleTask, waitlistTask, promotedTask
+        )
             .addOnSuccessListener {
+                if (isGone()) return@addOnSuccessListener
                 val event = eventTask.result
                 if (event == null) {
                     Toast.makeText(this, R.string.event_not_found, Toast.LENGTH_LONG).show()
@@ -300,11 +317,14 @@ class EventDetailsActivity : AppCompatActivity() {
                 loadedEvent = event
                 invalidateOptionsMenu()
                 showEvent(event, userCourse, isEnrolled, waitlistTask.result)
+                // inscrito automaticamente pela fila: o aviso de inscrição explica o que aconteceu
+                if (isEnrolled && promotedTask.result) txtEnrolled.setText(R.string.promoted_banner)
                 showStatus(event, isOwner)
                 showRatingState(event, isEnrolled, myRating)
                 if (event.hasEnded()) loadRatingAverage()
             }
             .addOnFailureListener { error ->
+                if (isGone()) return@addOnFailureListener
                 Toast.makeText(this, error.message, Toast.LENGTH_LONG).show()
                 finish()
             }
@@ -464,7 +484,7 @@ class EventDetailsActivity : AppCompatActivity() {
         if (!isOwner || availableAt == null || OrganizerRules.canFinish(event)) {
             return getString(R.string.in_progress_banner)
         }
-        val time = SimpleDateFormat("HH:mm", Locale.forLanguageTag("pt-BR")).format(availableAt)
+        val time = CampusTime.formatter("HH:mm").format(availableAt)
         return getString(R.string.finish_available_at, time)
     }
 

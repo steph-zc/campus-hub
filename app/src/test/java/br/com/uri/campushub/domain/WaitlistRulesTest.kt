@@ -21,6 +21,13 @@ class WaitlistRulesTest {
         assertTrue(WaitlistRules.canJoin(full, course, isEnrolled = false, now = NOW))
     }
 
+    // vaga livre esperando o primeiro da fila: quem chega entra no fim da fila
+    @Test
+    fun `student joins a queue that is still being served`() {
+        val queued = event(capacity = 10, enrolledCount = 9).copy(waitlistNext = 2, waitlistHead = 1)
+        assertTrue(WaitlistRules.canJoin(queued, course, isEnrolled = false, now = NOW))
+    }
+
     // com vaga, o caminho é se inscrever; inscrito não precisa esperar
     @Test
     fun `no waitlist with spots left or when already enrolled`() {

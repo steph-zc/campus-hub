@@ -2,6 +2,7 @@ package br.com.uri.campushub.testing
 
 import br.com.uri.campushub.data.model.Event
 import br.com.uri.campushub.data.model.EventStatus
+import br.com.uri.campushub.domain.CampusTime
 import com.google.firebase.Timestamp
 import java.util.Calendar
 import java.util.Date
@@ -14,14 +15,14 @@ object TestEvents {
     val NOW: Date = date(2026, Calendar.OCTOBER, 15, 12, 0)
 
     fun date(year: Int, month: Int, day: Int, hour: Int, minute: Int): Date =
-        Calendar.getInstance().apply {
+        CampusTime.calendar().apply {
             clear()
             set(year, month, day, hour, minute)
         }.time
 
     // dia relativo ao NOW: negativo = já aconteceu, positivo = ainda vai acontecer
     fun daysFromNow(days: Int): Date =
-        Calendar.getInstance().apply {
+        CampusTime.calendar().apply {
             time = NOW
             add(Calendar.DAY_OF_MONTH, days)
         }.time

@@ -1,6 +1,8 @@
 package br.com.uri.campushub.ui.common
 
+import android.app.Activity
 import android.content.Context
+import android.content.ContextWrapper
 import android.view.View
 import android.widget.ImageView
 import br.com.uri.campushub.data.model.Event
@@ -30,6 +32,7 @@ object EventImages {
 
     // capa do evento na view; sem imagem, a view some (a tela decide o espaço que sobra)
     fun show(view: ImageView, event: Event) {
+        if (isDestroyed(view)) return
         if (!event.withImage()) {
             Glide.with(view).clear(view)
             view.visibility = View.GONE
@@ -41,8 +44,20 @@ object EventImages {
 
     // carrega qualquer modelo aceito pelo Glide (a capa salva ou os bytes de uma imagem nova)
     fun load(view: ImageView, model: Any) {
+        if (isDestroyed(view)) return
         register(view.context.applicationContext)
         Glide.with(view).load(model).centerCrop().into(view)
+    }
+
+    // a view pertence a uma tela já destruída: o Glide lançaria exceção e fecharia o app,
+    // e não há mais nada para mostrar. A Activity vem do contexto da view (ContextWrapper)
+    private fun isDestroyed(view: ImageView): Boolean {
+        var context = view.context
+        while (context is ContextWrapper) {
+            if (context is Activity) return context.isDestroyed
+            context = context.baseContext
+        }
+        return false
     }
 
     // registra o carregador uma vez só, na primeira capa mostrada

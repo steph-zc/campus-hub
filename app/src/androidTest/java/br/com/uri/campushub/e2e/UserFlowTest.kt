@@ -23,6 +23,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import br.com.uri.campushub.R
 import br.com.uri.campushub.data.model.Event
 import br.com.uri.campushub.data.repository.CommentRepository
+import br.com.uri.campushub.data.repository.EnrollmentRepository
 import br.com.uri.campushub.data.repository.EventRepository
 import br.com.uri.campushub.data.repository.FavoriteRepository
 import br.com.uri.campushub.data.repository.WaitlistRepository
@@ -195,5 +196,28 @@ class UserFlowTest {
         }
 
         assertEquals(0, WaitlistRepository(db).getPosition(uid, "lotado").await())
+    }
+
+    // fluxo 4: a aluna está na fila e quem ocupava a vaga cancela (sem atender a fila).
+    // Ao abrir o evento, o próprio app dela atende a fila: ela é inscrita e vê o aviso
+    @Test
+    fun studentInQueueIsEnrolledWhenASpotOpens() {
+        signIn(ADMIN_EMAIL)
+        saveEvents(mapOf("lotado" to Event(title = "Lotado", date = daysFromNow(5), capacity = 1)))
+        val betoUid = createStudent("beto@campushub.test", "Beto", COURSE)
+        EnrollmentRepository(db).enroll(betoUid, "lotado").await()
+        val uid = createStudent(EMAIL, NAME, COURSE)
+        WaitlistRepository(db).join(uid, "lotado").await()
+        signIn("beto@campushub.test")
+        EnrollmentRepository(db).cancel(betoUid, "lotado").await()
+        signIn(EMAIL)
+
+        val intent = Intent(context, EventDetailsActivity::class.java)
+            .putExtra(EventDetailsActivity.EXTRA_EVENT_ID, "lotado")
+        ActivityScenario.launch<EventDetailsActivity>(intent).use {
+            waitFor(withId(R.id.txtEnrolled), matches(withText(R.string.promoted_banner)))
+        }
+
+        assertEquals(1, EventRepository(db).get("lotado").await()?.enrolledCount)
     }
 }

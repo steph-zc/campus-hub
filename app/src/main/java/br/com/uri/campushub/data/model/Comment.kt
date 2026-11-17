@@ -2,8 +2,7 @@ package br.com.uri.campushub.data.model
 
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.DocumentId
-import java.text.SimpleDateFormat
-import java.util.Locale
+import br.com.uri.campushub.domain.CampusTime
 
 // comentário guardado em events/{eventId}/comments
 data class Comment(
@@ -18,7 +17,7 @@ data class Comment(
     val editedAt: Timestamp? = null
 ) {
     fun formattedDate(): String {
-        val format = SimpleDateFormat("dd/MM/yyyy 'às' HH:mm", Locale.forLanguageTag("pt-BR"))
-        return createdAt?.let { format.format(it.toDate()) } ?: ""
+        // no fuso do campus (CampusTime), igual às datas dos eventos
+        return createdAt?.let { CampusTime.formatter("dd/MM/yyyy 'às' HH:mm").format(it.toDate()) } ?: ""
     }
 }

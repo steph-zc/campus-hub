@@ -35,7 +35,6 @@ class EnrollmentRepositoryTest {
     private val db = mockk<FirebaseFirestore>()
     private val eventRef = mockk<DocumentReference>()
     private val enrollmentRef = mockk<DocumentReference>()
-    private val waitlistRef = mockk<DocumentReference>()
     private val transaction = mockk<Transaction>(relaxed = true)
     private val eventSnapshot = mockk<DocumentSnapshot>()
     private val enrollmentSnapshot = mockk<DocumentSnapshot>()
@@ -45,7 +44,6 @@ class EnrollmentRepositoryTest {
     fun setUp() {
         every { db.collection("events").document("event-1") } returns eventRef
         every { db.collection("users").document("uid-ana").collection("enrollments").document("event-1") } returns enrollmentRef
-        every { eventRef.collection("waitlist").document("uid-ana") } returns waitlistRef
 
         // executa a função da transação com a Transaction falsa e devolve o resultado como Task
         every { db.runTransaction(any<Transaction.Function<Void?>>()) } answers {
@@ -99,8 +97,6 @@ class EnrollmentRepositoryTest {
         assertEquals("event-1", saved["eventId"])
         assertEquals(FieldValue.serverTimestamp(), saved["enrolledAt"])
         verify(exactly = 1) { transaction.update(eventRef, "enrolledCount", any()) }
-        // quem se inscreve sai da lista de espera na mesma transação
-        verify { transaction.delete(waitlistRef) }
     }
 
     // tocar duas vezes no botão não pode gastar duas vagas
@@ -140,6 +136,40 @@ class EnrollmentRepositoryTest {
             assertFalse(EnrollmentRepository.isSoldOut(error))
         }
         verify(exactly = 0) { transaction.set(any<DocumentReference>(), any()) }
+    }
+
+    // vaga livre, mas com gente na lista de espera: a vaga é do primeiro da fila
+    @Test
+    fun `event with a queue refuses the enrollment as sold out`() {
+        eventInDatabase(event(capacity = 10, enrolledCount = 9).copy(waitlistNext = 3, waitlistHead = 1))
+        alreadyEnrolled(false)
+
+        val error = repository.enroll("uid-ana", "event-1").awaitException()
+
+        assertTrue(EnrollmentRepository.isSoldOut(error))
+        verify(exactly = 0) { transaction.set(any<DocumentReference>(), any()) }
+    }
+
+    // inscrição feita pela fila: o aviso aparece uma vez e a marca é apagada
+    @Test
+    fun `promotion notice shows once and clears the mark`() {
+        val snapshot = mockk<DocumentSnapshot>()
+        every { enrollmentRef.get() } returns Tasks.forResult(snapshot)
+        every { snapshot.getBoolean("fromWaitlist") } returns true
+        every { enrollmentRef.update("fromWaitlist", FieldValue.delete()) } returns Tasks.forResult(null)
+
+        assertTrue(repository.takePromotionNotice("uid-ana", "event-1").await())
+        verify { enrollmentRef.update("fromWaitlist", FieldValue.delete()) }
+    }
+
+    @Test
+    fun `regular enrollment has no promotion notice`() {
+        val snapshot = mockk<DocumentSnapshot>()
+        every { enrollmentRef.get() } returns Tasks.forResult(snapshot)
+        every { snapshot.getBoolean("fromWaitlist") } returns null
+
+        assertFalse(repository.takePromotionNotice("uid-ana", "event-1").await())
+        verify(exactly = 0) { enrollmentRef.update(any<String>(), any()) }
     }
 
     @Test

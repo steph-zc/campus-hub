@@ -57,6 +57,13 @@ class EnrollmentRulesTest {
         assertEquals(Status.SOLD_OUT, EnrollmentRules.check(overbooked, course, NOW))
     }
 
+    // vaga livre, mas com fila: para quem chega o evento continua lotado
+    @Test
+    fun `free spot with a queue is still sold out`() {
+        val queued = event(capacity = 30, enrolledCount = 29).copy(waitlistNext = 2, waitlistHead = 1)
+        assertEquals(Status.SOLD_OUT, EnrollmentRules.check(queued, course, NOW))
+    }
+
     @Test
     fun `last spot is still available`() {
         val almostFull = event(capacity = 30, enrolledCount = 29)

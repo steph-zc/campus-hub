@@ -87,6 +87,27 @@ service cloud.firestore {
             || isAdmin());
     }
 
+    // ---------- lista de espera (senhas) ----------
+
+    // waitlistNext = próxima senha a entregar; waitlistHead = próxima a atender (0 nos eventos sem fila)
+    function queueNext(event) {
+      return event.data.get('waitlistNext', 0);
+    }
+
+    function queueHead(event) {
+      return event.data.get('waitlistHead', 0);
+    }
+
+    // events/{eventId}/waitlistTickets/{senha}: a senha aponta para o aluno (userId)
+    function ticketPath(eventId, ticket) {
+      return /databases/$(database)/documents/events/$(eventId)/waitlistTickets/$(string(ticket));
+    }
+
+    // events/{eventId}/waitlist/{uid}: o lugar do aluno na fila, com a senha dele
+    function waitlistEntryPath(eventId, uid) {
+      return /databases/$(database)/documents/events/$(eventId)/waitlist/$(uid);
+    }
+
     // ---------- admins ----------
 
     // nenhum cliente lê ou grava; o app só descobre que é admin quando a gravação é aceita
@@ -142,10 +163,26 @@ service cloud.firestore {
       match /enrollments/{eventId} {
         allow read: if isOwner(uid);
 
+        // inscrição automática pela lista de espera, gravada pelo app de quem liberou a vaga
+        // (WaitlistRepository.settle): só vale para o dono da senha da vez (waitlistHead),
+        // com a senha atendida e o waitlistHead avançando 1 na mesma transação
+        function isPromotedEnrollment(uid, eventId) {
+          let head = queueHead(get(eventPath(eventId)));
+          return signedIn()
+            && hasExactly(['eventId', 'enrolledAt', 'fromWaitlist'])
+            && data().eventId == eventId
+            && data().enrolledAt == request.time
+            && data().fromWaitlist == true
+            && exists(ticketPath(eventId, head))
+            && get(ticketPath(eventId, head)).data.userId == uid
+            && !existsAfter(ticketPath(eventId, head))
+            && queueHead(getAfter(eventPath(eventId))) == head + 1;
+        }
+
         // inscrever: evento publicado (nem rascunho nem com inscrições encerradas), futuro,
-        // aberto ao curso do aluno e com o enrolledCount
-        // subindo 1 na mesma transação (getAfter = como o evento fica depois dela)
-        allow create: if isOwner(uid)
+        // aberto ao curso do aluno, sem ninguém na lista de espera (a vaga seria do primeiro da fila)
+        // e com o enrolledCount subindo 1 na mesma transação (getAfter = como o evento fica depois dela)
+        allow create: if (isOwner(uid)
           && hasExactly(['eventId', 'enrolledAt'])
           && data().eventId == eventId
           && data().enrolledAt == request.time
@@ -154,16 +191,22 @@ service cloud.firestore {
           && (get(eventPath(eventId)).data.openToAll
               || get(eventPath(eventId)).data.course
                    == get(/databases/$(database)/documents/users/$(uid)).data.course)
+          && queueHead(get(eventPath(eventId))) >= queueNext(get(eventPath(eventId)))
           && getAfter(eventPath(eventId)).data.enrolledCount
-               == get(eventPath(eventId)).data.enrolledCount + 1;
+               == get(eventPath(eventId)).data.enrolledCount + 1)
+          || isPromotedEnrollment(uid, eventId);
+
+        // o aluno inscrito pela fila apaga só a marca fromWaitlist, depois de ver o aviso
+        allow update: if isOwner(uid)
+          && resource.data.get('fromWaitlist', false) == true
+          && data().diff(resource.data).affectedKeys().hasOnly(['fromWaitlist'])
+          && !data().keys().hasAny(['fromWaitlist']);
 
         // cancelar: só antes do evento, devolvendo a vaga na mesma transação
         allow delete: if isOwner(uid)
           && isUpcoming(eventId)
           && getAfter(eventPath(eventId)).data.enrolledCount
                == get(eventPath(eventId)).data.enrolledCount - 1;
-
-        allow update: if false;
       }
     }
 
@@ -213,6 +256,48 @@ service cloud.firestore {
             || (after == before - 1
               && exists(enrollment)
               && !existsAfter(enrollment)));
+    }
+
+    // aluno entra na fila: a senha entregue é a waitlistNext, que avança 1, junto com o lugar dele
+    function isWaitlistJoin(eventId) {
+      let next = queueNext(resource);
+      let entry = waitlistEntryPath(eventId, request.auth.uid);
+      return signedIn()
+        && changesOnly(['waitlistNext'])
+        && data().waitlistNext == next + 1
+        && existsAfter(entry)
+        && getAfter(entry).data.ticket == next;
+    }
+
+    // senha da vez de quem já saiu da fila: qualquer conta logada avança para a próxima
+    function isWaitlistSkip(eventId) {
+      let head = queueHead(resource);
+      return signedIn()
+        && changesOnly(['waitlistHead'])
+        && head < queueNext(resource)
+        && data().waitlistHead == head + 1
+        && !exists(ticketPath(eventId, head));
+    }
+
+    // vaga livre e fila andando: qualquer conta logada inscreve o dono da senha da vez
+    // (o app de quem cancelou, do organizador que aumentou a capacidade, ou de quem abriu o evento).
+    // A vaga é ocupada, a senha é atendida e o aluno sai da fila, tudo na mesma transação
+    function isWaitlistPromotion(eventId) {
+      let head = queueHead(resource);
+      let ticket = ticketPath(eventId, head);
+      return signedIn()
+        && changesOnly(['enrolledCount', 'waitlistHead'])
+        && head < queueNext(resource)
+        && data().waitlistHead == head + 1
+        && data().enrolledCount == resource.data.enrolledCount + 1
+        && data().enrolledCount <= resource.data.capacity
+        && statusOf(resource) == 'published'
+        && resource.data.date > request.time
+        && exists(ticket)
+        && !existsAfter(ticket)
+        && !exists(enrollmentPath(get(ticket).data.userId, eventId))
+        && existsAfter(enrollmentPath(get(ticket).data.userId, eventId))
+        && !existsAfter(waitlistEntryPath(eventId, get(ticket).data.userId));
     }
 
     // campos que o organizador preenche no formulário (EventDraft no app)
@@ -312,34 +397,70 @@ service cloud.firestore {
       allow create: if isAdmin() || isOwnEventCreate(eventId);
       allow delete: if isAdmin() || isOwnEventDelete();
       allow update: if isAdmin() || isEnrollmentCount(eventId) || isOwnEventEdit(eventId)
-        || isOwnStatusChange();
+        || isOwnStatusChange() || isWaitlistJoin(eventId) || isWaitlistSkip(eventId)
+        || isWaitlistPromotion(eventId);
 
-      // ---------- lista de espera: events/{eventId}/waitlist/{uid} ----------
+      // ---------- lista de espera: events/{eventId}/waitlist/{uid} e waitlistTickets/{senha} ----------
 
-      // um documento por aluno na fila (id = uid), só com a hora do servidor em que ele entrou
+      // o aluno pode esperar por este evento: publicado, futuro, aberto ao curso dele,
+      // lotado ou já com fila, e ele ainda não está inscrito (WaitlistRules.canJoin no app)
+      function canWaitFor(uid) {
+        let event = get(eventPath(eventId));
+        return statusOf(event) == 'published'
+          && isUpcoming(eventId)
+          && (event.data.openToAll
+              || event.data.course == get(/databases/$(database)/documents/users/$(uid)).data.course)
+          && (event.data.enrolledCount >= event.data.capacity || queueHead(event) < queueNext(event))
+          && !exists(enrollmentPath(uid, eventId));
+      }
+
+      // um documento por aluno na fila (id = uid): a senha dele e a hora do servidor em que entrou
       match /waitlist/{uid} {
-        // a posição é calculada contando quem entrou antes (agregação count), então a fila é lida
-        // por qualquer conta logada; os documentos não têm nome nem email, só o uid e a hora
+        // a posição é calculada contando as senhas até a dele (agregação count), então a fila é lida
+        // por qualquer conta logada; os documentos não têm nome nem email, só o uid, a senha e a hora
         allow read: if signedIn();
 
-        // entrar: o próprio aluno, com a hora do servidor, num evento publicado, futuro,
-        // aberto ao curso dele e sem vaga (o mesmo que o WaitlistRules.canJoin no app),
-        // e só se ele ainda não estiver inscrito
+        // entrar: o próprio aluno, com a senha waitlistNext do evento e a hora do servidor,
+        // junto com a senha em waitlistTickets e o waitlistNext avançando (mesma transação)
         allow create: if isOwner(uid)
-          && hasExactly(['joinedAt'])
+          && hasExactly(['ticket', 'joinedAt'])
           && data().joinedAt == request.time
-          && statusOf(get(eventPath(eventId))) == 'published'
-          && isUpcoming(eventId)
-          && (get(eventPath(eventId)).data.openToAll
-              || get(eventPath(eventId)).data.course
-                   == get(/databases/$(database)/documents/users/$(uid)).data.course)
-          && get(eventPath(eventId)).data.enrolledCount >= get(eventPath(eventId)).data.capacity
-          && !exists(enrollmentPath(uid, eventId));
+          && data().ticket == queueNext(get(eventPath(eventId)))
+          && existsAfter(ticketPath(eventId, data().ticket))
+          && canWaitFor(uid);
 
-        // sair da fila, ou sair junto com a própria inscrição (transação do EnrollmentRepository)
-        allow delete: if isOwner(uid);
+        // sair: o próprio aluno, apagando a senha junto; ou ser inscrito pela fila (settle de outra conta),
+        // com a inscrição criada e a senha dele atendida na mesma transação
+        allow delete: if (isOwner(uid)
+            && !existsAfter(ticketPath(eventId, resource.data.get('ticket', -1))))
+          || (signedIn()
+            && existsAfter(enrollmentPath(uid, eventId))
+            && queueHead(getAfter(eventPath(eventId))) == resource.data.get('ticket', -1) + 1);
 
-        // a hora de entrada não muda: quem sai e volta vai para o fim
+        // a senha não muda: quem sai e volta pega uma senha nova, no fim da fila
+        allow update: if false;
+      }
+
+      // a senha aponta para o aluno; é por ela que as regras sabem quem é o primeiro da fila
+      match /waitlistTickets/{ticket} {
+        allow read: if signedIn();
+
+        // criada pelo próprio aluno, junto com o lugar dele na fila e com o mesmo número
+        allow create: if signedIn()
+          && hasExactly(['userId'])
+          && data().userId == request.auth.uid
+          && getAfter(waitlistEntryPath(eventId, request.auth.uid)).data.ticket == int(ticket);
+
+        // apagada quando o aluno sai da fila, ou quando é atendida (o waitlistHead passa dela
+        // e o aluno fica inscrito, na mesma transação)
+        allow delete: if (signedIn()
+            && resource.data.userId == request.auth.uid
+            && !existsAfter(waitlistEntryPath(eventId, request.auth.uid)))
+          || (signedIn()
+            && queueHead(get(eventPath(eventId))) == int(ticket)
+            && queueHead(getAfter(eventPath(eventId))) == int(ticket) + 1
+            && existsAfter(enrollmentPath(resource.data.userId, eventId)));
+
         allow update: if false;
       }
 

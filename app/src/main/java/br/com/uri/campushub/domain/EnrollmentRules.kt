@@ -21,7 +21,8 @@ object EnrollmentRules {
         event.currentStatus() == EventStatus.DRAFT -> Status.NOT_PUBLISHED
         event.currentStatus() == EventStatus.CLOSED -> Status.CLOSED
         !event.acceptsCourse(userCourse) -> Status.OTHER_COURSE
-        event.remainingSpots() == 0 -> Status.SOLD_OUT
+        // com gente na lista de espera, a vaga que abrir é dela: para quem chega, o evento continua lotado
+        event.remainingSpots() == 0 || event.hasQueue() -> Status.SOLD_OUT
         else -> Status.ALLOWED
     }
 

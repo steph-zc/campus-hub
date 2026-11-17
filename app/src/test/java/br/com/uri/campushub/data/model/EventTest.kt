@@ -104,6 +104,14 @@ class EventTest {
         assertTrue(past.copy(organizerId = "uid-caio").inProgress())
     }
 
+    // fila com senhas: vazia quando a próxima a atender é a próxima a entregar
+    @Test
+    fun `queue exists while some ticket waits`() {
+        assertFalse(Event().hasQueue())
+        assertTrue(Event(waitlistNext = 3, waitlistHead = 1).hasQueue())
+        assertFalse(Event(waitlistNext = 3, waitlistHead = 3).hasQueue())
+    }
+
     // evento antigo, sem o campo status: o padrão do modelo é publicado
     @Test
     fun `event without status is published`() {

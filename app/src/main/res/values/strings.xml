@@ -153,7 +153,7 @@
     <string name="waitlist_joined">Você entrou na lista de espera</string>
     <string name="waitlist_left">Você saiu da lista de espera</string>
     <string name="leave_waitlist_question">Sair da lista de espera? Se voltar depois, você vai para o fim da fila.</string>
-    <string name="stay_in_waitlist">Continuar na fila</string>
+    <string name="promoted_banner">Uma vaga abriu e você foi inscrito pela lista de espera!</string>
     <string name="publish_event">Publicar evento</string>
     <string name="close_enrollments">Encerrar inscrições</string>
     <string name="publish_event_question">Publicar o evento? Ele passa a aparecer para todos os alunos e não volta a ser rascunho.</string>

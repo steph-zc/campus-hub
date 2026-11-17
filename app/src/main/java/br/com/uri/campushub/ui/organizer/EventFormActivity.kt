@@ -22,7 +22,9 @@ import br.com.uri.campushub.data.model.EventImageChange
 import br.com.uri.campushub.data.model.Role
 import br.com.uri.campushub.data.repository.AuthRepository
 import br.com.uri.campushub.data.repository.EventRepository
+import br.com.uri.campushub.data.repository.WaitlistRepository
 import br.com.uri.campushub.data.repository.UserRepository
+import br.com.uri.campushub.domain.CampusTime
 import br.com.uri.campushub.domain.CoordinateParser
 import br.com.uri.campushub.domain.EventDateTime
 import br.com.uri.campushub.domain.EventFormValidator
@@ -45,7 +47,6 @@ import com.google.android.material.timepicker.MaterialTimePicker
 import com.google.android.material.timepicker.TimeFormat
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.GeoPoint
-import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.io.File
@@ -106,6 +107,7 @@ class EventFormActivity : AppCompatActivity() {
     private val authRepository = AuthRepository()
     private val userRepository = UserRepository()
     private val eventRepository = EventRepository()
+    private val waitlistRepository = WaitlistRepository()
     private lateinit var geocoder: AddressGeocoder
     private lateinit var mapPicker: MapPointPicker
     private lateinit var compressor: ImageCompressor
@@ -305,7 +307,8 @@ class EventFormActivity : AppCompatActivity() {
 
         event.date?.toDate()?.let { date ->
             pickerDay = EventDateTime.toPickerUtcMillis(date)
-            val local = Calendar.getInstance().apply { time = date }
+            // hora salva lida no fuso do campus, o mesmo usado para gravar
+            val local = CampusTime.calendar().apply { time = date }
             hour = local.get(Calendar.HOUR_OF_DAY)
             minute = local.get(Calendar.MINUTE)
         }
@@ -344,7 +347,7 @@ class EventFormActivity : AppCompatActivity() {
     }
 
     private fun showDateAndTime() {
-        edtDate.setText(selectedDate()?.let { SimpleDateFormat("dd/MM/yyyy", brazil).format(it) } ?: "")
+        edtDate.setText(selectedDate()?.let { CampusTime.formatter("dd/MM/yyyy").format(it) } ?: "")
         edtTime.setText(String.format(brazil, "%02d:%02d", hour, minute))
     }
 
@@ -500,7 +503,11 @@ class EventFormActivity : AppCompatActivity() {
                 val write: Task<*> = if (id == null) {
                     eventRepository.create(uid, draft, (change as? EventImageChange.Replace)?.jpeg)
                 } else {
+                    // capacidade aumentada: as vagas novas vão para os primeiros da lista de espera
+                    // (WaitlistRepository.settle); se a fila falhar, a edição continua salva e
+                    // quem abrir o evento termina de atender a fila
                     eventRepository.update(id, draft, change)
+                        .onSuccessTask { waitlistRepository.settle(id).continueWith { null } }
                 }
                 // whenAll repassa a falha da gravação (por exemplo, recusada pelas regras)
                 Tasks.whenAll(write)

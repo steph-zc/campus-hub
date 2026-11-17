@@ -3,13 +3,15 @@ package br.com.uri.campushub.data.repository
 import br.com.uri.campushub.data.model.Event
 import br.com.uri.campushub.data.model.EventStatus
 import com.google.android.gms.tasks.Task
+import com.google.android.gms.tasks.Tasks
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreException
 
 // inscrições em users/{uid}/enrollments/{eventId} e o contador enrolledCount do evento
 // o id da inscrição é o id do evento, então cada aluno só tem uma por evento.
-// Ao se inscrever, o aluno sai da lista de espera (events/{eventId}/waitlist/{uid}, WaitlistRepository)
+// Inscrições feitas pela lista de espera (WaitlistRepository.settle) vêm com fromWaitlist = true
+// até o aluno ver o aviso (takePromotionNotice)
 class EnrollmentRepository(private val db: FirebaseFirestore = FirebaseFirestore.getInstance()) {
 
     companion object {
@@ -28,9 +30,6 @@ class EnrollmentRepository(private val db: FirebaseFirestore = FirebaseFirestore
     }
 
     private fun eventDoc(eventId: String) = db.collection("events").document(eventId)
-
-    private fun waitlistDoc(uid: String, eventId: String) =
-        eventDoc(eventId).collection(WaitlistRepository.COLLECTION).document(uid)
 
     private fun enrollmentDoc(uid: String, eventId: String) =
         db.collection("users").document(uid).collection("enrollments").document(eventId)
@@ -60,7 +59,8 @@ class EnrollmentRepository(private val db: FirebaseFirestore = FirebaseFirestore
             if (event.currentStatus() != EventStatus.PUBLISHED) {
                 throw FirebaseFirestoreException(CLOSED, FirebaseFirestoreException.Code.ABORTED)
             }
-            if (event.remainingSpots() == 0) {
+            // sem vaga, ou com fila: a vaga que abrir é do primeiro da lista de espera
+            if (event.remainingSpots() == 0 || event.hasQueue()) {
                 throw FirebaseFirestoreException(SOLD_OUT, FirebaseFirestoreException.Code.ABORTED)
             }
 
@@ -70,12 +70,24 @@ class EnrollmentRepository(private val db: FirebaseFirestore = FirebaseFirestore
             )
             transaction.set(enrollmentRef, data)
             transaction.update(eventRef, "enrolledCount", FieldValue.increment(1))
-            // inscrito não precisa mais esperar: apagar um documento que não existe não dá erro
-            transaction.delete(waitlistDoc(uid, eventId))
             null
         }
     }
 
+    // true uma vez só, quando o aluno foi inscrito automaticamente pela lista de espera:
+    // lê a inscrição e apaga a marca fromWaitlist, para o aviso não aparecer de novo
+    fun takePromotionNotice(uid: String, eventId: String): Task<Boolean> {
+        val ref = enrollmentDoc(uid, eventId)
+        return ref.get().onSuccessTask { snapshot ->
+            if (snapshot.getBoolean("fromWaitlist") != true) return@onSuccessTask Tasks.forResult(false)
+            ref.update("fromWaitlist", FieldValue.delete()).continueWith { task ->
+                task.result
+                true
+            }
+        }
+    }
+
+    // a vaga liberada vai para a lista de espera: depois de cancelar, a tela chama o WaitlistRepository.settle
     fun cancel(uid: String, eventId: String): Task<Void?> {
         val eventRef = eventDoc(eventId)
         val enrollmentRef = enrollmentDoc(uid, eventId)

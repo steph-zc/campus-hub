@@ -10,12 +10,14 @@ import br.com.uri.campushub.testing.EmulatorData.signIn
 import br.com.uri.campushub.testing.FirebaseEmulator
 import br.com.uri.campushub.testing.await
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 
 // integração do WaitlistRepository com o emulador do Firestore: a ordem da fila pela hora do servidor,
-// a posição calculada pela agregação count e a saída da fila ao se inscrever (EnrollmentRepository).
+// a posição calculada pela agregação count e a inscrição automática do primeiro da fila (settle).
 // Antes, rode na raiz do projeto: firebase emulators:start
 @RunWith(AndroidJUnit4::class)
 class WaitlistRepositoryIntegrationTest {
@@ -66,16 +68,29 @@ class WaitlistRepositoryIntegrationTest {
         assertEquals(1, waitlist.getPosition(betoUid, EVENT).await())
     }
 
-    // a vaga do Caio abre: a Ana, que estava na fila, se inscreve e sai da fila na mesma transação
+    // a vaga do Caio abre: o settle inscreve a Ana, que estava na fila, e ela vê o aviso uma vez só
     @Test
-    fun enrollingRemovesTheStudentFromTheQueue() {
+    fun freedSpotEnrollsTheFirstInQueueWithANotice() {
         signIn(ANA)
         waitlist.join(anaUid, EVENT).await()
         signIn(CAIO)
         enrollments.cancel(caioUid, EVENT).await()
+        assertEquals(1, waitlist.settle(EVENT).await())
 
         signIn(ANA)
-        enrollments.enroll(anaUid, EVENT).await()
+        assertTrue(enrollments.isEnrolled(anaUid, EVENT).await())
         assertEquals(0, waitlist.getPosition(anaUid, EVENT).await())
+        assertTrue(enrollments.takePromotionNotice(anaUid, EVENT).await())
+        assertFalse(enrollments.takePromotionNotice(anaUid, EVENT).await())
+    }
+
+    // sem vaga, o settle não inscreve ninguém e a fila fica como está
+    @Test
+    fun settleWithoutSpotsChangesNothing() {
+        signIn(ANA)
+        waitlist.join(anaUid, EVENT).await()
+
+        assertEquals(0, waitlist.settle(EVENT).await())
+        assertEquals(1, waitlist.getPosition(anaUid, EVENT).await())
     }
 }

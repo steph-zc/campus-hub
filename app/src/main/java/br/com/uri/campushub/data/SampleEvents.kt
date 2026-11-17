@@ -1,6 +1,7 @@
 package br.com.uri.campushub.data
 
 import br.com.uri.campushub.data.model.Event
+import br.com.uri.campushub.domain.CampusTime
 import com.google.android.gms.tasks.Task
 import com.google.android.gms.tasks.Tasks
 import com.google.firebase.Timestamp
@@ -223,7 +224,8 @@ object SampleEvents {
     }
 
     private fun date(year: Int, month: Int, day: Int, hour: Int, minute: Int): Timestamp {
-        val calendar = Calendar.getInstance()
+        // datas dos exemplos no fuso do campus (CampusTime)
+        val calendar = CampusTime.calendar()
         calendar.set(year, month, day, hour, minute, 0)
         return Timestamp(calendar.time)
     }
