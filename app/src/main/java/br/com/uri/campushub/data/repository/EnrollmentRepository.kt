@@ -1,6 +1,7 @@
 package br.com.uri.campushub.data.repository
 
 import br.com.uri.campushub.data.model.Event
+import br.com.uri.campushub.data.model.EventStatus
 import com.google.android.gms.tasks.Task
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
@@ -12,9 +13,17 @@ class EnrollmentRepository(private val db: FirebaseFirestore = FirebaseFirestore
 
     companion object {
         private const val SOLD_OUT = "sold_out"
+        private const val CLOSED = "enrollments_closed"
 
         // a tela usa para mostrar "Vagas esgotadas" em vez da mensagem técnica
-        fun isSoldOut(error: Exception) = error.message == SOLD_OUT || error.cause?.message == SOLD_OUT
+        fun isSoldOut(error: Exception) = hasMessage(error, SOLD_OUT)
+
+        // o organizador encerrou as inscrições enquanto a tela do aluno estava aberta
+        fun isClosed(error: Exception) = hasMessage(error, CLOSED)
+
+        // o Firestore às vezes embrulha o erro da transação em outro
+        private fun hasMessage(error: Exception, message: String) =
+            error.message == message || error.cause?.message == message
     }
 
     private fun eventDoc(eventId: String) = db.collection("events").document(eventId)
@@ -42,6 +51,10 @@ class EnrollmentRepository(private val db: FirebaseFirestore = FirebaseFirestore
 
             if (enrollment.exists()) {
                 return@runTransaction null
+            }
+            // rascunho ou inscrições encerradas: as regras recusariam; o erro próprio vira um aviso claro
+            if (event.currentStatus() != EventStatus.PUBLISHED) {
+                throw FirebaseFirestoreException(CLOSED, FirebaseFirestoreException.Code.ABORTED)
             }
             if (event.remainingSpots() == 0) {
                 throw FirebaseFirestoreException(SOLD_OUT, FirebaseFirestoreException.Code.ABORTED)

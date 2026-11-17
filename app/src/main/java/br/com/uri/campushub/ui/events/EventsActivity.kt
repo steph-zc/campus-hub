@@ -125,13 +125,22 @@ class EventsActivity : AppCompatActivity() {
             }
     }
 
-    private fun loadEvents() {
+    // busca no Firestore os eventos publicados e encerrados (EventRepository.getAll);
+    // canPrepare evita repetir a preparação dos exemplos mais de uma vez na mesma carga
+    private fun loadEvents(canPrepare: Boolean = true) {
         eventRepository.getAll()
             .addOnSuccessListener { events ->
                 if (events.isEmpty()) {
-                    // primeira execução: cria os eventos de exemplo e busca de novo
-                    eventRepository.saveSampleEvents()
-                        .addOnSuccessListener { loadEvents() }
+                    if (!canPrepare) {
+                        showNoEvents()
+                        return@addOnSuccessListener
+                    }
+                    // nada visível: na conta admin, grava os exemplos ou publica os eventos antigos
+                    // (sem o campo status) e busca de novo
+                    eventRepository.prepareSampleData()
+                        .addOnSuccessListener { changed ->
+                            if (changed) loadEvents(canPrepare = false) else showNoEvents()
+                        }
                         .addOnFailureListener { error ->
                             // aluno sem permissão de admin: a lista fica vazia com um aviso
                             if (EventRepository.isPermissionDenied(error)) showNoEvents() else showError(error)

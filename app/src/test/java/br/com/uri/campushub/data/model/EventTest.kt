@@ -1,5 +1,6 @@
 package br.com.uri.campushub.data.model
 
+import br.com.uri.campushub.testing.TestEvents
 import br.com.uri.campushub.testing.TestEvents.NOW
 import br.com.uri.campushub.testing.TestEvents.event
 import com.google.firebase.Timestamp
@@ -78,5 +79,35 @@ class EventTest {
         assertTrue(event.openToAll)
         assertEquals(0, event.enrolledCount)
         assertNull(event.coordinates)
+    }
+
+    // evento de organizador: começa no horário, mas só acaba quando ele encerra
+    @Test
+    fun `organizer event ends only when finished`() {
+        val started = Event(organizerId = "uid-caio", date = Timestamp(TestEvents.daysFromNow(-1)))
+        assertTrue(started.hasStarted(NOW))
+        assertFalse(started.hasEnded(NOW))
+        assertTrue(started.inProgress(NOW))
+
+        val finished = started.copy(status = EventStatus.FINISHED.value)
+        assertTrue(finished.hasEnded(NOW))
+        assertFalse(finished.inProgress(NOW))
+    }
+
+    // sem o "now", usa o relógio real, como as telas
+    @Test
+    fun `start and end use the current time when no date is given`() {
+        val past = Event(date = Timestamp(TestEvents.daysFromNow(-TestEvents.TEN_YEARS_IN_DAYS)))
+        assertTrue(past.hasStarted())
+        assertTrue(past.hasEnded())
+        assertFalse(past.copy(organizerId = "uid-caio").hasEnded())
+        assertTrue(past.copy(organizerId = "uid-caio").inProgress())
+    }
+
+    // evento antigo, sem o campo status: o padrão do modelo é publicado
+    @Test
+    fun `event without status is published`() {
+        assertEquals(EventStatus.PUBLISHED, Event().currentStatus())
+        assertEquals(EventStatus.CLOSED, Event(status = "closed").currentStatus())
     }
 }

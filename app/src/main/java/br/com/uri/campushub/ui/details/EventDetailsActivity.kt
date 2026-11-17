@@ -20,6 +20,7 @@ import androidx.recyclerview.widget.RecyclerView
 import br.com.uri.campushub.R
 import br.com.uri.campushub.data.model.Comment
 import br.com.uri.campushub.data.model.Event
+import br.com.uri.campushub.data.model.EventStatus
 import br.com.uri.campushub.data.repository.AuthRepository
 import br.com.uri.campushub.data.repository.CommentRepository
 import br.com.uri.campushub.data.repository.EnrollmentRepository
@@ -36,6 +37,7 @@ import br.com.uri.campushub.ui.common.setupToolbar
 import br.com.uri.campushub.ui.events.EventChips
 import br.com.uri.campushub.ui.media.MediaSection
 import br.com.uri.campushub.ui.organizer.EventFormActivity
+import com.google.android.gms.tasks.Task
 import com.google.android.gms.tasks.Tasks
 import com.google.android.material.appbar.AppBarLayout
 import com.google.android.material.appbar.MaterialToolbar
@@ -44,6 +46,7 @@ import com.google.android.material.card.MaterialCardView
 import com.google.android.material.chip.Chip
 import com.google.android.material.textfield.TextInputEditText
 import com.google.android.material.textfield.TextInputLayout
+import java.text.SimpleDateFormat
 import java.util.Locale
 import org.osmdroid.views.MapView
 
@@ -68,6 +71,10 @@ class EventDetailsActivity : AppCompatActivity() {
     private lateinit var txtCapacity: TextView
     private lateinit var txtRatingAverage: TextView
     private lateinit var txtEnrolled: TextView
+    private lateinit var txtEventStatus: TextView
+    private lateinit var btnPublish: MaterialButton
+    private lateinit var btnCloseEnrollments: MaterialButton
+    private lateinit var btnFinish: MaterialButton
     private lateinit var btnEnroll: MaterialButton
     private lateinit var btnCancelEnrollment: MaterialButton
     private lateinit var cardRating: MaterialCardView
@@ -99,8 +106,12 @@ class EventDetailsActivity : AppCompatActivity() {
     // null enquanto os dados não chegaram; o coração só aparece depois
     private var isFavorite: Boolean? = null
 
-    // true quando a conta logada é a organizadora responsável pelo evento
+    // true quando a conta logada é a organizadora responsável pelo evento e ele ainda não foi encerrado
     private var canEdit = false
+
+    // evento carregado, usado ao excluir (a capa vai junto); canDelete = dono e sem inscritos
+    private var loadedEvent: Event? = null
+    private var canDelete = false
 
     // abre o formulário de edição; se o organizador salvar, os detalhes são lidos de novo
     private val editEvent = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
@@ -130,6 +141,10 @@ class EventDetailsActivity : AppCompatActivity() {
         txtCapacity = findViewById(R.id.txtCapacity)
         txtRatingAverage = findViewById(R.id.txtRatingAverage)
         txtEnrolled = findViewById(R.id.txtEnrolled)
+        txtEventStatus = findViewById(R.id.txtEventStatus)
+        btnPublish = findViewById(R.id.btnPublish)
+        btnCloseEnrollments = findViewById(R.id.btnCloseEnrollments)
+        btnFinish = findViewById(R.id.btnFinish)
         btnEnroll = findViewById(R.id.btnEnroll)
         btnCancelEnrollment = findViewById(R.id.btnCancelEnrollment)
         cardRating = findViewById(R.id.cardRating)
@@ -159,6 +174,9 @@ class EventDetailsActivity : AppCompatActivity() {
 
         btnEnroll.setOnClickListener { enroll() }
         btnCancelEnrollment.setOnClickListener { confirmCancel() }
+        btnPublish.setOnClickListener { confirmPublish() }
+        btnCloseEnrollments.setOnClickListener { confirmCloseEnrollments() }
+        btnFinish.setOnClickListener { confirmFinish() }
         layoutComment.setEndIconOnClickListener { postComment() }
 
         // fromUser separa o toque do aluno de quando o código preenche a nota salva
@@ -194,6 +212,7 @@ class EventDetailsActivity : AppCompatActivity() {
             item.setTitle(R.string.add_favorite)
         }
         menu.findItem(R.id.menuEditEvent).isVisible = canEdit
+        menu.findItem(R.id.menuDeleteEvent).isVisible = canDelete
         return super.onPrepareOptionsMenu(menu)
     }
 
@@ -201,6 +220,10 @@ class EventDetailsActivity : AppCompatActivity() {
         when (item.itemId) {
             R.id.menuFavorite -> {
                 toggleFavorite()
+                return true
+            }
+            R.id.menuDeleteEvent -> {
+                confirmDeleteEvent()
                 return true
             }
             R.id.menuEditEvent -> {
@@ -258,9 +281,13 @@ class EventDetailsActivity : AppCompatActivity() {
                 isFavorite = favoriteTask.result
                 // 0 = ainda não avaliou
                 val myRating = ratingTask.result
-                canEdit = OrganizerRules.canManage(event, uid, roleTask.result)
+                val isOwner = OrganizerRules.canManage(event, uid, roleTask.result)
+                canEdit = isOwner && OrganizerRules.canEdit(event)
+                canDelete = isOwner && OrganizerRules.canDelete(event)
+                loadedEvent = event
                 invalidateOptionsMenu()
                 showEvent(event, userCourse, isEnrolled)
+                showStatus(event, isOwner)
                 showRatingState(event, isEnrolled, myRating)
                 if (event.hasEnded()) loadRatingAverage()
             }
@@ -374,11 +401,101 @@ class EventDetailsActivity : AppCompatActivity() {
         btnEnroll.isEnabled = status == EnrollmentRules.Status.ALLOWED
         btnEnroll.text = when (status) {
             EnrollmentRules.Status.ENDED -> getString(R.string.event_ended)
+            EnrollmentRules.Status.IN_PROGRESS -> getString(R.string.in_progress)
+            EnrollmentRules.Status.NOT_PUBLISHED -> getString(R.string.not_published)
+            EnrollmentRules.Status.CLOSED -> getString(R.string.enrollments_closed)
             EnrollmentRules.Status.OTHER_COURSE -> getString(R.string.only_for_course, event.course)
             EnrollmentRules.Status.SOLD_OUT -> getString(R.string.sold_out)
             EnrollmentRules.Status.ALLOWED -> getString(R.string.enroll)
         }
         btnCancelEnrollment.isEnabled = true
+    }
+
+    // aviso da situação do evento e, para o organizador dono, os botões de publicar,
+    // encerrar as inscrições e encerrar o evento (OrganizerRules decide quando cada um vale)
+    private fun showStatus(event: Event, isOwner: Boolean) {
+        val banner = when {
+            event.currentStatus() == EventStatus.FINISHED -> getString(R.string.finished_banner)
+            event.currentStatus() == EventStatus.DRAFT ->
+                getString(if (OrganizerRules.canPublish(event)) R.string.draft_banner else R.string.draft_past_banner)
+            event.inProgress() -> inProgressText(event, isOwner)
+            event.currentStatus() == EventStatus.CLOSED -> getString(R.string.closed_banner)
+            else -> null
+        }
+        txtEventStatus.visibility = if (banner == null) View.GONE else View.VISIBLE
+        txtEventStatus.text = banner
+
+        btnPublish.visibility = visibleIf(isOwner && OrganizerRules.canPublish(event))
+        btnCloseEnrollments.visibility = visibleIf(isOwner && OrganizerRules.canCloseEnrollments(event))
+        btnFinish.visibility = visibleIf(isOwner && OrganizerRules.canFinish(event))
+        btnPublish.isEnabled = true
+        btnCloseEnrollments.isEnabled = true
+        btnFinish.isEnabled = true
+    }
+
+    // em andamento: o dono vê a partir de quando pode encerrar, enquanto o botão ainda não vale
+    private fun inProgressText(event: Event, isOwner: Boolean): String {
+        val availableAt = OrganizerRules.finishAvailableAt(event)
+        if (!isOwner || availableAt == null || OrganizerRules.canFinish(event)) {
+            return getString(R.string.in_progress_banner)
+        }
+        val time = SimpleDateFormat("HH:mm", Locale.forLanguageTag("pt-BR")).format(availableAt)
+        return getString(R.string.finish_available_at, time)
+    }
+
+    private fun visibleIf(condition: Boolean) = if (condition) View.VISIBLE else View.GONE
+
+    private fun confirmPublish() {
+        confirm(R.string.publish_event_question, R.string.publish_event) {
+            changeStatus(btnPublish, eventRepository.publish(eventId), R.string.event_published)
+        }
+    }
+
+    private fun confirmCloseEnrollments() {
+        confirm(R.string.close_enrollments_question, R.string.close_enrollments) {
+            changeStatus(btnCloseEnrollments, eventRepository.closeEnrollments(eventId), R.string.enrollments_closed_done)
+        }
+    }
+
+    private fun confirmFinish() {
+        confirm(R.string.finish_event_question, R.string.finish_event) {
+            changeStatus(btnFinish, eventRepository.finish(eventId), R.string.event_finished)
+        }
+    }
+
+    // exclui o evento e a capa (EventRepository.delete); a tela fecha e a lista de quem abriu recarrega
+    private fun confirmDeleteEvent() {
+        val event = loadedEvent ?: return
+        confirm(R.string.delete_event_question, R.string.delete) {
+            eventRepository.delete(event)
+                .addOnSuccessListener {
+                    Toast.makeText(this, R.string.event_deleted, Toast.LENGTH_SHORT).show()
+                    finish()
+                }
+                // alguém se inscreveu enquanto a tela estava aberta: as regras recusam e os dados são lidos de novo
+                .addOnFailureListener { error -> showError(error) }
+        }
+    }
+
+    // diálogo de confirmação com o botão positivo e a ação; o negativo só fecha
+    private fun confirm(message: Int, positive: Int, action: () -> Unit) {
+        AlertDialog.Builder(this)
+            .setMessage(message)
+            .setPositiveButton(positive) { _, _ -> action() }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
+    }
+
+    // grava a nova situação no Firestore (EventRepository.publish/closeEnrollments/finish) e lê os detalhes de novo;
+    // se as regras recusarem (por exemplo, a data passou enquanto a tela estava aberta), mostra o erro
+    private fun changeStatus(button: MaterialButton, task: Task<Void>, done: Int) {
+        button.isEnabled = false
+        task
+            .addOnSuccessListener {
+                Toast.makeText(this, done, Toast.LENGTH_SHORT).show()
+                loadData()
+            }
+            .addOnFailureListener { error -> showError(error) }
     }
 
     private fun enroll() {
@@ -393,6 +510,10 @@ class EventDetailsActivity : AppCompatActivity() {
                 // outro aluno pegou a última vaga enquanto a tela estava aberta
                 if (EnrollmentRepository.isSoldOut(error)) {
                     Toast.makeText(this, R.string.sold_out, Toast.LENGTH_LONG).show()
+                    loadData()
+                } else if (EnrollmentRepository.isClosed(error)) {
+                    // o organizador encerrou as inscrições enquanto a tela estava aberta
+                    Toast.makeText(this, R.string.enrollments_closed, Toast.LENGTH_LONG).show()
                     loadData()
                 } else {
                     showError(error)

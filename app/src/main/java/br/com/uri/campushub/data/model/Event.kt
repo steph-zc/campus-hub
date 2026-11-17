@@ -31,16 +31,32 @@ data class Event(
     val organizerId: String = "",
     // versão da imagem de capa em eventImages/{id}; 0 = evento sem imagem.
     // Muda a cada imagem nova e serve de chave do cache do Glide
-    val imageVersion: Long = 0
+    val imageVersion: Long = 0,
+    // situação gravada (EventStatus.value): rascunho, publicado, inscrições encerradas ou evento encerrado.
+    // O padrão é "published" para os eventos gravados antes do campo existir
+    val status: String = EventStatus.PUBLISHED.value
 ) {
     // sem "is" nem "get" no nome, para o Firestore não gravar como campo do documento
     fun withImage() = imageVersion > 0
+
+    // situação como enum, para o app comparar sem depender do texto gravado
+    fun currentStatus() = EventStatus.from(status)
 
     fun remainingSpots() = (capacity - enrolledCount).coerceAtLeast(0)
 
     // não pode começar com "is": o Firestore acharia que é um campo e gravaria no documento
     // "now" tem valor padrão; os testes podem passar outra data para simular o tempo
-    fun hasEnded(now: Date = Date()) = date != null && date.toDate().before(now)
+
+    // o horário de início já chegou: não aceita mais inscrições nem cancelamentos
+    fun hasStarted(now: Date = Date()) = date != null && date.toDate().before(now)
+
+    // o evento acabou: o de organizador só quando ele encerra (status finished);
+    // os de exemplo do admin (sem organizador) continuam acabando no horário de início
+    fun hasEnded(now: Date = Date()) =
+        if (organizerId.isEmpty()) hasStarted(now) else currentStatus() == EventStatus.FINISHED
+
+    // já começou e o organizador ainda não encerrou
+    fun inProgress(now: Date = Date()) = hasStarted(now) && !hasEnded(now)
 
     // exclusivos só aceitam alunos do mesmo curso
     fun acceptsCourse(userCourse: String) = openToAll || course == userCourse

@@ -8,6 +8,7 @@ import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 import br.com.uri.campushub.R
 import br.com.uri.campushub.data.model.Event
+import br.com.uri.campushub.data.model.EventStatus
 import br.com.uri.campushub.ui.common.EventImages
 import com.google.android.material.chip.Chip
 
@@ -51,8 +52,12 @@ class EventAdapter(
         holder.txtTitle.text = event.title
         holder.txtTime.text = event.time()
         holder.txtLocation.text = event.location
+        // rascunho só aparece na área do organizador; em andamento e com inscrições encerradas não mostram vagas
         holder.txtCapacity.text = when {
             event.hasEnded() -> context.getString(R.string.event_ended)
+            event.hasStarted() -> context.getString(R.string.in_progress)
+            event.currentStatus() == EventStatus.DRAFT -> context.getString(R.string.status_draft)
+            event.currentStatus() == EventStatus.CLOSED -> context.getString(R.string.enrollments_closed)
             event.remainingSpots() > 0 -> context.getString(R.string.remaining_spots, event.remainingSpots())
             else -> context.getString(R.string.sold_out)
         }

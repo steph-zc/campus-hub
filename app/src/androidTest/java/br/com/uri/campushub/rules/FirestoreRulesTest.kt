@@ -3,6 +3,7 @@ package br.com.uri.campushub.rules
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import br.com.uri.campushub.data.model.Event
 import br.com.uri.campushub.data.model.EventImageChange
+import br.com.uri.campushub.data.model.EventStatus
 import br.com.uri.campushub.data.model.MediaPost
 import br.com.uri.campushub.data.model.Role
 import br.com.uri.campushub.data.model.User
@@ -20,6 +21,7 @@ import br.com.uri.campushub.testing.EmulatorData.createOrganizer
 import br.com.uri.campushub.testing.EmulatorData.createStudent
 import br.com.uri.campushub.testing.EmulatorData.daysFromNow
 import br.com.uri.campushub.testing.EmulatorData.eventDraft
+import br.com.uri.campushub.testing.EmulatorData.minutesFromNow
 import br.com.uri.campushub.testing.EmulatorData.moveEventDate
 import br.com.uri.campushub.testing.EmulatorData.saveEvents
 import br.com.uri.campushub.testing.EmulatorData.signIn
@@ -27,11 +29,14 @@ import br.com.uri.campushub.testing.EmulatorData.signUp
 import br.com.uri.campushub.testing.FirebaseEmulator
 import br.com.uri.campushub.testing.assertPermissionDenied
 import br.com.uri.campushub.testing.await
+import br.com.uri.campushub.testing.awaitError
 import com.google.firebase.firestore.FieldValue
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -56,6 +61,7 @@ class FirestoreRulesTest {
         const val LAW_ONLY = "so-direito"
         const val FULL = "lotado"
         const val ENDED = "encerrado"
+        const val CLOSED = "inscricoes-encerradas"
     }
 
     private val db = FirebaseEmulator.firestore
@@ -83,7 +89,9 @@ class FirestoreRulesTest {
             OPEN to Event(title = "Aberto", date = daysFromNow(7), capacity = 10),
             LAW_ONLY to Event(title = "Só Direito", date = daysFromNow(7), capacity = 10, course = "Direito", openToAll = false),
             FULL to Event(title = "Lotado", date = daysFromNow(7), capacity = 1, enrolledCount = 1),
-            ENDED to Event(title = "Encerrado", date = daysFromNow(-1), capacity = 10)
+            ENDED to Event(title = "Encerrado", date = daysFromNow(-1), capacity = 10),
+            CLOSED to Event(title = "Inscrições encerradas", date = daysFromNow(7), capacity = 10,
+                status = EventStatus.CLOSED.value)
         ))
 
         betoUid = createStudent(BETO_EMAIL, "Beto", "Direito")
@@ -158,6 +166,7 @@ class FirestoreRulesTest {
         events.create(caioUid, eventDraft(capacity = 0)).assertPermissionDenied()
         events.create(caioUid, eventDraft(capacity = 5001)).assertPermissionDenied()
         val id = events.create(caioUid, eventDraft(capacity = 2)).await()
+        events.publish(id).await()
 
         signIn(ANA_EMAIL)
         enrollments.enroll(anaUid, id).await()
@@ -200,11 +209,179 @@ class FirestoreRulesTest {
         events.update(id, eventDraft(), EventImageChange.Replace(first)).await()
         images.document(id).delete().assertPermissionDenied()
 
-        // qualquer aluno vê a capa, mas não troca nem remove a de outro dono
+        // a capa do rascunho só o dono vê; depois de publicado, qualquer aluno vê,
+        // mas não troca nem remove a de outro dono
+        signIn(ANA_EMAIL)
+        images.read(id).assertPermissionDenied()
+        signIn(CAIO_EMAIL)
+        events.publish(id).await()
         signIn(ANA_EMAIL)
         assertArrayEquals(first, images.read(id).await())
         events.update(id, eventDraft(), EventImageChange.Replace(byteArrayOf(7))).assertPermissionDenied()
         events.update(id, eventDraft(), EventImageChange.Remove).assertPermissionDenied()
+    }
+
+    // ---------- publicar e encerrar ----------
+
+    // rascunho: só o dono lê; a lista dos alunos não traz e a consulta sem filtro é recusada
+    @Test
+    fun draftIsVisibleOnlyToItsOrganizer() {
+        val caioUid = createOrganizer(CAIO_EMAIL, "Caio", "Direito")
+        val id = events.create(caioUid, eventDraft(title = "Rascunho")).await()
+        assertEquals(EventStatus.DRAFT, events.get(id).await()?.currentStatus())
+        assertEquals(listOf(id), events.getByOrganizer(caioUid).await().map { it.id })
+
+        signIn(ANA_EMAIL)
+        db.collection("events").document(id).get().assertPermissionDenied()
+        assertFalse(events.getAll().await().any { it.id == id })
+        assertEquals(emptyList<Event>(), events.getByIds(listOf(id)).await())
+        db.collection("events").get().assertPermissionDenied()
+        events.prepareSampleData().assertPermissionDenied()
+        // evento que não existe continua voltando como "não encontrado"
+        assertNull(events.get("apagado").await())
+
+        // inscrição direto pelo SDK, pulando a conferência do app
+        db.runBatch { batch ->
+            batch.set(enrollmentDoc(anaUid, id), enrollmentData(id))
+            batch.update(db.collection("events").document(id), "enrolledCount", FieldValue.increment(1))
+        }.assertPermissionDenied()
+    }
+
+    // só o dono muda a situação, e só para a frente: rascunho → publicado → inscrições encerradas
+    @Test
+    fun onlyTheOwnerPublishesAndClosesEnrollmentsInOrder() {
+        val caioUid = createOrganizer(CAIO_EMAIL, "Caio", "Direito")
+        val id = events.create(caioUid, eventDraft()).await()
+        val doc = db.collection("events").document(id)
+
+        // pular etapas, ou outra conta publicando
+        events.closeEnrollments(id).assertPermissionDenied()
+        events.finish(id).assertPermissionDenied()
+        signIn(ANA_EMAIL)
+        events.publish(id).assertPermissionDenied()
+
+        signIn(CAIO_EMAIL)
+        events.publish(id).await()
+        signIn(ANA_EMAIL)
+        assertTrue(events.getAll().await().any { it.id == id })
+        events.closeEnrollments(id).assertPermissionDenied()
+
+        // status só sai junto com nada mais; valor inventado é recusado
+        signIn(CAIO_EMAIL)
+        doc.update(mapOf("status" to "closed", "title" to "Outro")).assertPermissionDenied()
+        doc.update("status", "archived").assertPermissionDenied()
+        doc.update("status", "draft").assertPermissionDenied()
+
+        events.closeEnrollments(id).await()
+        assertEquals(EventStatus.CLOSED, events.get(id).await()?.currentStatus())
+
+        // inscrições encerradas não voltam, mas o evento ainda é editado
+        events.publish(id).assertPermissionDenied()
+        events.update(id, eventDraft(title = "Editado")).await()
+
+        // os eventos do admin não são do organizador
+        events.closeEnrollments(OPEN).assertPermissionDenied()
+    }
+
+    // encerrar o evento: só o dono e só 1 hora depois do início; depois disso nada mais muda
+    @Test
+    fun eventIsFinishedOnlyOneHourAfterItStarts() {
+        val caioUid = createOrganizer(CAIO_EMAIL, "Caio", "Direito")
+        val id = events.create(caioUid, eventDraft()).await()
+        events.publish(id).await()
+
+        // começou há 30 minutos: ainda não dá
+        moveEventDate(id, minutesFromNow(-30))
+        signIn(CAIO_EMAIL)
+        events.finish(id).assertPermissionDenied()
+
+        // começou há 2 horas: outra conta não encerra, o dono sim
+        moveEventDate(id, minutesFromNow(-120))
+        signIn(ANA_EMAIL)
+        events.finish(id).assertPermissionDenied()
+        signIn(CAIO_EMAIL)
+        events.finish(id).await()
+        assertEquals(EventStatus.FINISHED, events.get(id).await()?.currentStatus())
+
+        // encerrado não volta nem é editado
+        db.collection("events").document(id).update("status", "published").assertPermissionDenied()
+        events.update(id, eventDraft(title = "Editado", days = 3)).assertPermissionDenied()
+    }
+
+    // excluir: só o dono e só sem inscritos; a capa vai junto
+    @Test
+    fun ownerDeletesOnlyAnEventWithoutEnrollments() {
+        val caioUid = createOrganizer(CAIO_EMAIL, "Caio", "Direito")
+        val id = events.create(caioUid, eventDraft(), byteArrayOf(1, 2, 3)).await()
+        events.publish(id).await()
+        val event = events.get(id).await()!!
+
+        // com uma aluna inscrita, nem o dono exclui
+        signIn(ANA_EMAIL)
+        events.delete(event).assertPermissionDenied()
+        enrollments.enroll(anaUid, id).await()
+        signIn(CAIO_EMAIL)
+        events.delete(event).assertPermissionDenied()
+
+        // ela desiste: o evento fica sem inscritos e o dono exclui, com a capa
+        signIn(ANA_EMAIL)
+        enrollments.cancel(anaUid, id).await()
+        signIn(CAIO_EMAIL)
+        events.delete(event).await()
+        assertNull(events.get(id).await())
+        assertNull(images.read(id).await())
+
+        // os eventos do admin continuam só com o admin
+        db.collection("events").document(OPEN).delete().assertPermissionDenied()
+    }
+
+    // evento de organizador: avaliação só depois que ele encerra, não no horário de início
+    @Test
+    fun organizerEventIsRatedOnlyAfterItIsFinished() {
+        val caioUid = createOrganizer(CAIO_EMAIL, "Caio", "Direito")
+        val id = events.create(caioUid, eventDraft()).await()
+        events.publish(id).await()
+        signIn(ANA_EMAIL)
+        enrollments.enroll(anaUid, id).await()
+
+        moveEventDate(id, minutesFromNow(-120))
+        signIn(ANA_EMAIL)
+        ratings.save(anaUid, id, 5).assertPermissionDenied()
+
+        signIn(CAIO_EMAIL)
+        events.finish(id).await()
+        signIn(ANA_EMAIL)
+        ratings.save(anaUid, id, 5).await()
+    }
+
+    // rascunho com data que já passou não é publicado (ninguém conseguiria se inscrever)
+    @Test
+    fun pastDraftCannotBePublished() {
+        val caioUid = createOrganizer(CAIO_EMAIL, "Caio", "Direito")
+        val id = events.create(caioUid, eventDraft()).await()
+        moveEventDate(id, daysFromNow(-1))
+
+        signIn(CAIO_EMAIL)
+        events.publish(id).assertPermissionDenied()
+    }
+
+    // inscrições encerradas: ninguém entra, mesmo pulando o app; quem já estava pode desistir
+    @Test
+    fun closedEventRejectsNewEnrollmentsButAllowsCancelling() {
+        enrollments.enroll(anaUid, OPEN).await()
+        signIn(ADMIN_EMAIL)
+        db.collection("events").document(OPEN).update("status", EventStatus.CLOSED.value).await()
+
+        signIn(BETO_EMAIL)
+        assertTrue(EnrollmentRepository.isClosed(enrollments.enroll(betoUid, CLOSED).awaitError()))
+        db.runBatch { batch ->
+            batch.set(enrollmentDoc(betoUid, CLOSED), enrollmentData(CLOSED))
+            batch.update(db.collection("events").document(CLOSED), "enrolledCount", FieldValue.increment(1))
+        }.assertPermissionDenied()
+
+        signIn(ANA_EMAIL)
+        enrollments.cancel(anaUid, OPEN).await()
+        assertEquals(0, events.get(OPEN).await()?.enrolledCount)
     }
 
     // ---------- inscrições ----------

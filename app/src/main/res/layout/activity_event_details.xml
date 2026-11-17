@@ -134,6 +134,55 @@
 
             </com.google.android.material.card.MaterialCardView>
 
+            <!-- situação do evento: rascunho, inscrições encerradas, em andamento ou encerrado;
+                 some quando o evento está publicado e ainda não começou -->
+            <TextView
+                android:id="@+id/txtEventStatus"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:background="@drawable/bg_status_banner"
+                android:drawablePadding="12dp"
+                android:gravity="center_vertical"
+                android:padding="16dp"
+                android:textColor="@color/chip_closed_text"
+                android:textStyle="bold"
+                android:visibility="gone"
+                app:drawableStartCompat="@drawable/ic_lock"
+                app:drawableTint="@color/chip_closed_text" />
+
+            <!-- ações do organizador dono: publicar o rascunho, encerrar as inscrições ou encerrar o evento -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnPublish"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:layout_marginTop="12dp"
+                android:text="@string/publish_event"
+                android:visibility="gone"
+                app:cornerRadius="12dp"
+                app:icon="@drawable/ic_event_available" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnCloseEnrollments"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:layout_marginTop="12dp"
+                android:text="@string/close_enrollments"
+                android:visibility="gone"
+                app:cornerRadius="12dp"
+                app:icon="@drawable/ic_lock" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnFinish"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:layout_marginTop="12dp"
+                android:text="@string/finish_event"
+                android:visibility="gone"
+                app:cornerRadius="12dp"
+                app:icon="@drawable/ic_check_circle" />
+
             <!-- aparece só para quem já está inscrito -->
             <TextView
                 android:id="@+id/txtEnrolled"

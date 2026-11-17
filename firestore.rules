@@ -64,6 +64,29 @@ service cloud.firestore {
       return get(eventPath(eventId)).data.date > request.time;
     }
 
+    // situação do evento (EventStatus no app): 'draft', 'published', 'closed' (inscrições encerradas)
+    // ou 'finished' (evento encerrado pelo organizador).
+    // Eventos gravados antes do campo existir contam como publicados, igual ao app
+    function statusOf(event) {
+      return event.data.get('status', 'published');
+    }
+
+    // o evento já acabou (Event.hasEnded no app): o de organizador só quando ele encerra;
+    // os de exemplo do admin (sem organizador) acabam no horário de início
+    function hasEnded(event) {
+      return statusOf(event) == 'finished'
+        || (event.data.get('organizerId', '') == '' && event.data.date < request.time);
+    }
+
+    // quem pode ver um evento: publicado, com inscrições encerradas ou encerrado, qualquer conta logada;
+    // rascunho, só o organizador dono e a conta admin
+    function canSeeEvent(event) {
+      return signedIn()
+        && (statusOf(event) != 'draft'
+            || event.data.get('organizerId', '') == request.auth.uid
+            || isAdmin());
+    }
+
     // ---------- admins ----------
 
     // nenhum cliente lê ou grava; o app só descobre que é admin quando a gravação é aceita
@@ -119,12 +142,14 @@ service cloud.firestore {
       match /enrollments/{eventId} {
         allow read: if isOwner(uid);
 
-        // inscrever: evento futuro, aberto ao curso do aluno e com o enrolledCount
+        // inscrever: evento publicado (nem rascunho nem com inscrições encerradas), futuro,
+        // aberto ao curso do aluno e com o enrolledCount
         // subindo 1 na mesma transação (getAfter = como o evento fica depois dela)
         allow create: if isOwner(uid)
           && hasExactly(['eventId', 'enrolledAt'])
           && data().eventId == eventId
           && data().enrolledAt == request.time
+          && statusOf(get(eventPath(eventId))) == 'published'
           && isUpcoming(eventId)
           && (get(eventPath(eventId)).data.openToAll
               || get(eventPath(eventId)).data.course
@@ -148,7 +173,10 @@ service cloud.firestore {
     // Só o organizador dono grava, e sempre no mesmo lote que muda o imageVersion do evento
     // para a mesma versão (getAfter = como o evento fica depois do lote)
     match /eventImages/{eventId} {
-      allow read: if signedIn();
+      // a capa segue a visibilidade do evento: a de um rascunho só o dono (e o admin) vê;
+      // sem o evento (excluído), a leitura volta como "não encontrado" em vez de erro
+      allow read: if signedIn()
+        && (!exists(eventPath(eventId)) || canSeeEvent(get(eventPath(eventId))));
 
       // 500000 bytes: o mesmo limite do EventImageRepository.MAX_BYTES no app
       allow create, update: if isOrganizer()
@@ -161,10 +189,11 @@ service cloud.firestore {
         && data().version > 0
         && getAfter(eventPath(eventId)).data.imageVersion == data().version;
 
-      // remover a capa: o evento volta para imageVersion 0 no mesmo lote
+      // remover a capa: o evento volta para imageVersion 0 no mesmo lote, ou é excluído junto
       allow delete: if isOrganizer()
         && get(eventPath(eventId)).data.get('organizerId', '') == request.auth.uid
-        && getAfter(eventPath(eventId)).data.get('imageVersion', 0) == 0;
+        && (!existsAfter(eventPath(eventId))
+            || getAfter(eventPath(eventId)).data.get('imageVersion', 0) == 0);
     }
 
     // ---------- eventos: events/{eventId} ----------
@@ -217,11 +246,12 @@ service cloud.firestore {
             || (version > 0 && existsAfter(image) && getAfter(image).data.version == version));
     }
 
-    // organizador cria evento próprio: ele é o dono, começa sem inscritos e acontece no futuro
+    // organizador cria evento próprio: ele é o dono, começa como rascunho, sem inscritos e no futuro
     function isOwnEventCreate(eventId) {
       return isOrganizer()
-        && hasExactly(eventFormFields().concat(['organizerId', 'enrolledCount', 'imageVersion']))
+        && hasExactly(eventFormFields().concat(['organizerId', 'enrolledCount', 'imageVersion', 'status']))
         && data().organizerId == request.auth.uid
+        && data().status == 'draft'
         && data().enrolledCount == 0
         && data().date > request.time
         && isValidEventForm()
@@ -229,11 +259,12 @@ service cloud.firestore {
     }
 
     // organizador edita só o evento dele, só os campos do formulário e a versão da imagem
-    // (dono e inscritos não mudam); a capacidade não fica abaixo dos inscritos e a data,
-    // se mudar, vai para o futuro
+    // (dono, inscritos e situação não mudam); evento encerrado (finished) não é mais editado;
+    // a capacidade não fica abaixo dos inscritos e a data, se mudar, vai para o futuro
     function isOwnEventEdit(eventId) {
       return isOrganizer()
         && resource.data.get('organizerId', '') == request.auth.uid
+        && statusOf(resource) != 'finished'
         && changesOnly(eventFormFields().concat(['imageVersion']))
         && isValidEventForm()
         && data().capacity >= resource.data.enrolledCount
@@ -241,14 +272,47 @@ service cloud.firestore {
         && hasMatchingImage(eventId);
     }
 
-    match /events/{eventId} {
-      allow read: if signedIn();
+    // organizador muda só a situação do evento dele, sempre para a frente:
+    // rascunho → publicado (antes do início), publicado → inscrições encerradas (antes do início)
+    // e publicado ou com inscrições encerradas → evento encerrado (1 hora depois do início)
+    function isOwnStatusChange() {
+      let before = statusOf(resource);
+      let after = data().status;
+      return isOrganizer()
+        && resource.data.get('organizerId', '') == request.auth.uid
+        && changesOnly(['status'])
+        && ((before == 'draft' && after == 'published' && resource.data.date > request.time)
+            || (before == 'published' && after == 'closed' && resource.data.date > request.time)
+            || (before in ['published', 'closed'] && after == 'finished'
+                && request.time >= resource.data.date + duration.value(1, 'h')));
+    }
 
-      // admin grava os eventos de exemplo; organizador cria e edita os próprios.
-      // Excluir continua só com o admin: o organizador encerra o evento em vez de apagá-lo
+    // organizador exclui o evento dele só sem nenhum inscrito (OrganizerRules.canDelete no app);
+    // com inscritos o caminho é encerrar, para nenhum aluno perder a inscrição sem aviso
+    function isOwnEventDelete() {
+      return isOrganizer()
+        && resource.data.get('organizerId', '') == request.auth.uid
+        && resource.data.enrolledCount == 0;
+    }
+
+    match /events/{eventId} {
+      // um evento por id: publicado/encerrado para todos, rascunho só para o dono (canSeeEvent);
+      // id que não existe devolve "não encontrado" (resource null) em vez de erro de permissão
+      allow get: if signedIn() && (resource == null || canSeeEvent(resource));
+
+      // consultas: as regras não filtram, então a consulta precisa provar que só traz o permitido.
+      // Lista dos alunos: whereIn status ['published', 'closed', 'finished'];
+      // área do organizador: whereEqualTo organizerId == uid dele; admin consulta tudo
+      allow list: if signedIn()
+        && (resource.data.status in ['published', 'closed', 'finished']
+            || resource.data.organizerId == request.auth.uid
+            || isAdmin());
+
+      // admin grava os eventos de exemplo; organizador cria, edita, publica, encerra e exclui os próprios
       allow create: if isAdmin() || isOwnEventCreate(eventId);
-      allow delete: if isAdmin();
-      allow update: if isAdmin() || isEnrollmentCount(eventId) || isOwnEventEdit(eventId);
+      allow delete: if isAdmin() || isOwnEventDelete();
+      allow update: if isAdmin() || isEnrollmentCount(eventId) || isOwnEventEdit(eventId)
+        || isOwnStatusChange();
 
       // ---------- comentários: events/{eventId}/comments/{commentId} ----------
 
@@ -287,7 +351,7 @@ service cloud.firestore {
           && data().value >= 1 && data().value <= 5
           && data().updatedAt == request.time
           && exists(enrollmentPath(uid, eventId))
-          && get(eventPath(eventId)).data.date < request.time;
+          && hasEnded(get(eventPath(eventId)));
 
         allow delete: if false;
       }

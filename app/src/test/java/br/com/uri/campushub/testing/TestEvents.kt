@@ -1,6 +1,7 @@
 package br.com.uri.campushub.testing
 
 import br.com.uri.campushub.data.model.Event
+import br.com.uri.campushub.data.model.EventStatus
 import com.google.firebase.Timestamp
 import java.util.Calendar
 import java.util.Date
@@ -25,6 +26,11 @@ object TestEvents {
             add(Calendar.DAY_OF_MONTH, days)
         }.time
 
+    // evento que começa "minutes" minutos depois do NOW (negativo = já começou)
+    fun startingInMinutes(minutes: Int, organizerId: String = "uid-caio", status: EventStatus = EventStatus.PUBLISHED) =
+        event(organizerId = organizerId, status = status)
+            .copy(date = Timestamp(Date(NOW.time + minutes * 60_000L)))
+
     // distância grande o bastante para um evento ser "passado" ou "futuro" no relógio real;
     // usada nos testes das funções chamadas sem o parâmetro "now", como as telas fazem
     const val TEN_YEARS_IN_DAYS = 3650
@@ -39,7 +45,8 @@ object TestEvents {
         course: String = "Ciência da Computação",
         openToAll: Boolean = true,
         category: String = "Palestra",
-        organizerId: String = ""
+        organizerId: String = "",
+        status: EventStatus = EventStatus.PUBLISHED
     ) = Event(
         id = id,
         title = title,
@@ -49,6 +56,7 @@ object TestEvents {
         course = course,
         openToAll = openToAll,
         category = category,
-        organizerId = organizerId
+        organizerId = organizerId,
+        status = status.value
     )
 }

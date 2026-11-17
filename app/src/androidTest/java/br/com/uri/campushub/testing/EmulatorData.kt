@@ -84,6 +84,10 @@ object EmulatorData {
         openToAll = openToAll
     )
 
+    // horário relativo a agora em minutos (negativo = já começou), para a regra de "1 hora depois do início"
+    fun minutesFromNow(minutes: Int) =
+        Timestamp(Date(System.currentTimeMillis() + TimeUnit.MINUTES.toMillis(minutes.toLong())))
+
     fun daysFromNow(days: Int) =
         Timestamp(Date(System.currentTimeMillis() + TimeUnit.DAYS.toMillis(days.toLong())))
 }

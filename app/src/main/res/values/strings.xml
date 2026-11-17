@@ -128,6 +128,30 @@
     <string name="no_organized_events">Nenhum evento organizado ainda</string>
     <string name="no_organized_events_hint">Toque em Novo evento para criar o primeiro.</string>
 
+    <!-- situação do evento: rascunho, publicado, inscrições encerradas e evento encerrado (EventStatus) -->
+    <string name="status_draft">Rascunho, ainda não publicado</string>
+    <string name="enrollments_closed">Inscrições encerradas</string>
+    <string name="not_published">Evento ainda não publicado</string>
+    <string name="draft_banner">Rascunho: só você vê este evento. Publique para os alunos poderem se inscrever.</string>
+    <string name="draft_past_banner">Rascunho com data que já passou. Edite a data para poder publicar.</string>
+    <string name="closed_banner">As inscrições deste evento foram encerradas pelo organizador.</string>
+    <string name="in_progress">Em andamento</string>
+    <string name="in_progress_banner">Evento em andamento.</string>
+    <string name="finish_available_at">Evento em andamento. O organizador pode encerrá-lo a partir de %1$s.</string>
+    <string name="finished_banner">Evento encerrado pelo organizador.</string>
+    <string name="finish_event">Encerrar evento</string>
+    <string name="finish_event_question">Encerrar o evento? Ele passa a constar como realizado, as avaliações são liberadas e nada mais pode ser alterado.</string>
+    <string name="event_finished">Evento encerrado</string>
+    <string name="delete_event">Excluir evento</string>
+    <string name="delete_event_question">Excluir o evento? Ele some para todos e isso não pode ser desfeito.</string>
+    <string name="event_deleted">Evento excluído</string>
+    <string name="publish_event">Publicar evento</string>
+    <string name="close_enrollments">Encerrar inscrições</string>
+    <string name="publish_event_question">Publicar o evento? Ele passa a aparecer para todos os alunos e não volta a ser rascunho.</string>
+    <string name="close_enrollments_question">Encerrar as inscrições? Ninguém mais vai conseguir se inscrever, e isso não pode ser desfeito.</string>
+    <string name="event_published">Evento publicado</string>
+    <string name="enrollments_closed_done">Inscrições encerradas</string>
+
     <!-- formulário de evento do organizador (EventFormActivity) -->
     <string name="new_event">Novo evento</string>
     <string name="edit_event">Editar evento</string>

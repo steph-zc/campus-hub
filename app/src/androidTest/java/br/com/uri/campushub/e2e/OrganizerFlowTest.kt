@@ -5,18 +5,22 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Color
+import androidx.lifecycle.Lifecycle
 import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.espresso.Espresso.closeSoftKeyboard
 import androidx.test.espresso.Espresso.onView
+import androidx.test.espresso.Espresso.openActionBarOverflowOrOptionsMenu
 import androidx.test.espresso.action.ViewActions.click
 import androidx.test.espresso.action.ViewActions.replaceText
 import androidx.test.espresso.assertion.ViewAssertions.matches
+import androidx.test.espresso.matcher.RootMatchers.isDialog
 import androidx.test.espresso.matcher.ViewMatchers.withId
 import androidx.test.espresso.matcher.ViewMatchers.withText
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import br.com.uri.campushub.R
 import br.com.uri.campushub.data.media.JpegEncoder
+import br.com.uri.campushub.data.model.EventStatus
 import br.com.uri.campushub.data.repository.EventImageRepository
 import br.com.uri.campushub.data.repository.EventRepository
 import br.com.uri.campushub.testing.EmulatorData.createOrganizer
@@ -25,6 +29,7 @@ import br.com.uri.campushub.testing.FirebaseEmulator
 import br.com.uri.campushub.testing.await
 import br.com.uri.campushub.testing.nestedScrollTo
 import br.com.uri.campushub.testing.waitFor
+import br.com.uri.campushub.ui.details.EventDetailsActivity
 import br.com.uri.campushub.ui.organizer.EventFormActivity
 import com.google.firebase.firestore.GeoPoint
 import org.junit.Assert.assertEquals
@@ -120,5 +125,52 @@ class OrganizerFlowTest {
 
         assertEquals(0L, events.get(eventId).await()?.imageVersion)
         assertNull(EventImageRepository(FirebaseEmulator.firestore).read(eventId).await())
+    }
+
+    // nos detalhes, o organizador publica o rascunho e depois encerra as inscrições,
+    // confirmando cada passo no diálogo; o Firestore fica com a situação final
+    @Test
+    fun organizerPublishesTheDraftAndThenClosesEnrollments() {
+        val intent = Intent(context, EventDetailsActivity::class.java)
+            .putExtra(EventDetailsActivity.EXTRA_EVENT_ID, eventId)
+
+        ActivityScenario.launch<EventDetailsActivity>(intent).use {
+            waitFor(withId(R.id.txtEventStatus), matches(withText(R.string.draft_banner)))
+            onView(withId(R.id.btnPublish)).perform(nestedScrollTo(), click())
+            // button1 = botão positivo do AlertDialog
+            onView(withId(android.R.id.button1)).inRoot(isDialog()).perform(click())
+
+            waitFor(withId(R.id.btnCloseEnrollments))
+            onView(withId(R.id.btnCloseEnrollments)).perform(nestedScrollTo(), click())
+            onView(withId(android.R.id.button1)).inRoot(isDialog()).perform(click())
+
+            waitFor(withId(R.id.txtEventStatus), matches(withText(R.string.closed_banner)))
+            onView(withId(R.id.btnEnroll)).check(matches(withText(R.string.enrollments_closed)))
+        }
+
+        assertEquals(EventStatus.CLOSED, events.get(eventId).await()?.currentStatus())
+    }
+
+    // evento sem inscritos: o organizador exclui pelo menu dos detalhes, a tela fecha e o evento some
+    @Test
+    fun organizerDeletesAnEventWithoutEnrollments() {
+        val intent = Intent(context, EventDetailsActivity::class.java)
+            .putExtra(EventDetailsActivity.EXTRA_EVENT_ID, eventId)
+
+        ActivityScenario.launch<EventDetailsActivity>(intent).use { scenario ->
+            waitFor(withId(R.id.txtEventStatus))
+            openActionBarOverflowOrOptionsMenu(context)
+            onView(withText(R.string.delete_event)).perform(click())
+            onView(withId(android.R.id.button1)).inRoot(isDialog()).perform(click())
+
+            // a tela fecha sozinha depois da exclusão
+            val deadline = System.currentTimeMillis() + 15_000
+            while (scenario.state != Lifecycle.State.DESTROYED && System.currentTimeMillis() < deadline) {
+                Thread.sleep(200)
+            }
+            assertEquals(Lifecycle.State.DESTROYED, scenario.state)
+        }
+
+        assertNull(events.get(eventId).await())
     }
 }

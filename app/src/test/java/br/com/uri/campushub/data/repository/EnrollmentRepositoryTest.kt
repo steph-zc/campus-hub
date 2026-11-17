@@ -1,6 +1,7 @@
 package br.com.uri.campushub.data.repository
 
 import br.com.uri.campushub.data.model.Event
+import br.com.uri.campushub.data.model.EventStatus
 import br.com.uri.campushub.testing.TestEvents.event
 import br.com.uri.campushub.testing.await
 import br.com.uri.campushub.testing.awaitException
@@ -122,6 +123,21 @@ class EnrollmentRepositoryTest {
         verify(exactly = 0) { transaction.set(any<DocumentReference>(), any()) }
     }
 
+    // o organizador encerrou as inscrições (ou o evento ainda é rascunho): nada é gravado
+    @Test
+    fun `closed or draft event refuses the enrollment with the closed error`() {
+        alreadyEnrolled(false)
+        for (status in listOf(EventStatus.CLOSED, EventStatus.DRAFT)) {
+            eventInDatabase(event(status = status))
+
+            val error = repository.enroll("uid-ana", "event-1").awaitException()
+
+            assertTrue(EnrollmentRepository.isClosed(error))
+            assertFalse(EnrollmentRepository.isSoldOut(error))
+        }
+        verify(exactly = 0) { transaction.set(any<DocumentReference>(), any()) }
+    }
+
     @Test
     fun `cancelling deletes the enrollment and gives the spot back`() {
         alreadyEnrolled(true)
@@ -150,5 +166,13 @@ class EnrollmentRepositoryTest {
         assertTrue(EnrollmentRepository.isSoldOut(soldOut))
         assertTrue(EnrollmentRepository.isSoldOut(RuntimeException("falha na transação", soldOut)))
         assertFalse(EnrollmentRepository.isSoldOut(Exception("sem internet")))
+    }
+
+    @Test
+    fun `closed error is recognized directly or wrapped`() {
+        val closed = FirebaseFirestoreException("enrollments_closed", FirebaseFirestoreException.Code.ABORTED)
+        assertTrue(EnrollmentRepository.isClosed(closed))
+        assertTrue(EnrollmentRepository.isClosed(RuntimeException("falha na transação", closed)))
+        assertFalse(EnrollmentRepository.isClosed(Exception("sem internet")))
     }
 }
