@@ -28,9 +28,11 @@ import br.com.uri.campushub.data.repository.EventRepository
 import br.com.uri.campushub.data.repository.FavoriteRepository
 import br.com.uri.campushub.data.repository.RatingRepository
 import br.com.uri.campushub.data.repository.UserRepository
+import br.com.uri.campushub.data.repository.WaitlistRepository
 import br.com.uri.campushub.domain.EnrollmentRules
 import br.com.uri.campushub.domain.OrganizerRules
 import br.com.uri.campushub.domain.RatingRules
+import br.com.uri.campushub.domain.WaitlistRules
 import br.com.uri.campushub.ui.common.EventImages
 import br.com.uri.campushub.ui.common.applySystemBarsPadding
 import br.com.uri.campushub.ui.common.setupToolbar
@@ -75,6 +77,8 @@ class EventDetailsActivity : AppCompatActivity() {
     private lateinit var btnPublish: MaterialButton
     private lateinit var btnCloseEnrollments: MaterialButton
     private lateinit var btnFinish: MaterialButton
+    private lateinit var txtWaitlist: TextView
+    private lateinit var btnLeaveWaitlist: MaterialButton
     private lateinit var btnEnroll: MaterialButton
     private lateinit var btnCancelEnrollment: MaterialButton
     private lateinit var cardRating: MaterialCardView
@@ -98,6 +102,7 @@ class EventDetailsActivity : AppCompatActivity() {
     private val favoriteRepository = FavoriteRepository()
     private val commentRepository = CommentRepository()
     private val ratingRepository = RatingRepository()
+    private val waitlistRepository = WaitlistRepository()
 
     private lateinit var eventId: String
     private lateinit var uid: String
@@ -112,6 +117,9 @@ class EventDetailsActivity : AppCompatActivity() {
     // evento carregado, usado ao excluir (a capa vai junto); canDelete = dono e sem inscritos
     private var loadedEvent: Event? = null
     private var canDelete = false
+
+    // true quando o evento está lotado e o botão de inscrever vira "Entrar na lista de espera"
+    private var joinsWaitlist = false
 
     // abre o formulário de edição; se o organizador salvar, os detalhes são lidos de novo
     private val editEvent = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
@@ -145,6 +153,8 @@ class EventDetailsActivity : AppCompatActivity() {
         btnPublish = findViewById(R.id.btnPublish)
         btnCloseEnrollments = findViewById(R.id.btnCloseEnrollments)
         btnFinish = findViewById(R.id.btnFinish)
+        txtWaitlist = findViewById(R.id.txtWaitlist)
+        btnLeaveWaitlist = findViewById(R.id.btnLeaveWaitlist)
         btnEnroll = findViewById(R.id.btnEnroll)
         btnCancelEnrollment = findViewById(R.id.btnCancelEnrollment)
         cardRating = findViewById(R.id.cardRating)
@@ -172,7 +182,8 @@ class EventDetailsActivity : AppCompatActivity() {
         mediaSection = MediaSection(this, eventId, uid)
         mediaSection.restoreState(savedInstanceState)
 
-        btnEnroll.setOnClickListener { enroll() }
+        btnEnroll.setOnClickListener { if (joinsWaitlist) joinWaitlist() else enroll() }
+        btnLeaveWaitlist.setOnClickListener { confirmLeaveWaitlist() }
         btnCancelEnrollment.setOnClickListener { confirmCancel() }
         btnPublish.setOnClickListener { confirmPublish() }
         btnCloseEnrollments.setOnClickListener { confirmCloseEnrollments() }
@@ -263,9 +274,11 @@ class EventDetailsActivity : AppCompatActivity() {
         val favoriteTask = favoriteRepository.isFavorite(uid, eventId)
         val ratingTask = ratingRepository.getMyRating(uid, eventId)
         val roleTask = userRepository.getRole(uid)
+        // posição na lista de espera (WaitlistRepository, agregação count no Firestore); 0 = fora da fila
+        val waitlistTask = waitlistRepository.getPosition(uid, eventId)
 
-        // espera as seis buscas terminarem e depois lê o resultado de cada uma
-        Tasks.whenAllSuccess<Any>(eventTask, userTask, enrolledTask, favoriteTask, ratingTask, roleTask)
+        // espera as sete buscas terminarem e depois lê o resultado de cada uma
+        Tasks.whenAllSuccess<Any>(eventTask, userTask, enrolledTask, favoriteTask, ratingTask, roleTask, waitlistTask)
             .addOnSuccessListener {
                 val event = eventTask.result
                 if (event == null) {
@@ -286,7 +299,7 @@ class EventDetailsActivity : AppCompatActivity() {
                 canDelete = isOwner && OrganizerRules.canDelete(event)
                 loadedEvent = event
                 invalidateOptionsMenu()
-                showEvent(event, userCourse, isEnrolled)
+                showEvent(event, userCourse, isEnrolled, waitlistTask.result)
                 showStatus(event, isOwner)
                 showRatingState(event, isEnrolled, myRating)
                 if (event.hasEnded()) loadRatingAverage()
@@ -297,7 +310,7 @@ class EventDetailsActivity : AppCompatActivity() {
             }
     }
 
-    private fun showEvent(event: Event, userCourse: String, isEnrolled: Boolean) {
+    private fun showEvent(event: Event, userCourse: String, isEnrolled: Boolean, waitlistPosition: Int) {
         // capa do evento (coleção eventImages, pelo EventImages); some se o evento não tem imagem
         EventImages.show(imgCover, event)
         EventChips.bind(chipCourse, chipAccess, event)
@@ -311,7 +324,7 @@ class EventDetailsActivity : AppCompatActivity() {
         txtDescription.text = event.description
         showLocation(event)
 
-        showEnrollmentState(event, userCourse, isEnrolled)
+        showEnrollmentState(event, userCourse, isEnrolled, waitlistPosition)
 
         progressBar.visibility = View.GONE
         scrollContent.visibility = View.VISIBLE
@@ -389,23 +402,35 @@ class EventDetailsActivity : AppCompatActivity() {
             }
     }
 
-    private fun showEnrollmentState(event: Event, userCourse: String, isEnrolled: Boolean) {
+    private fun showEnrollmentState(event: Event, userCourse: String, isEnrolled: Boolean, waitlistPosition: Int) {
         txtEnrolled.visibility = if (isEnrolled) View.VISIBLE else View.GONE
         txtEnrolled.setText(if (event.hasEnded()) R.string.attended_banner else R.string.enrolled_banner)
         btnCancelEnrollment.visibility =
             if (EnrollmentRules.canCancel(event, isEnrolled)) View.VISIBLE else View.GONE
-        btnEnroll.visibility = if (isEnrolled) View.GONE else View.VISIBLE
 
-        // a regra diz se pode; a tela escolhe o texto do botão para cada motivo
+        // na fila: mostra a posição e o botão de sair, e esconde o de inscrever
+        val waiting = !isEnrolled && WaitlistRules.canLeave(event, waitlistPosition)
+        txtWaitlist.visibility = if (waiting) View.VISIBLE else View.GONE
+        txtWaitlist.text = getString(R.string.waitlist_position, waitlistPosition)
+        btnLeaveWaitlist.visibility = if (waiting) View.VISIBLE else View.GONE
+        btnLeaveWaitlist.isEnabled = true
+
+        // evento lotado que o aluno poderia fazer: o botão vira "Entrar na lista de espera"
+        joinsWaitlist = WaitlistRules.canJoin(event, userCourse, isEnrolled)
+
+        // a regra diz se pode; a tela escolhe o texto do botão para cada motivo.
+        // Quem está na fila só vê o botão de inscrever se uma vaga abriu
         val status = EnrollmentRules.check(event, userCourse)
-        btnEnroll.isEnabled = status == EnrollmentRules.Status.ALLOWED
+        val canEnrollNow = status == EnrollmentRules.Status.ALLOWED
+        btnEnroll.visibility = if (isEnrolled || (waiting && !canEnrollNow)) View.GONE else View.VISIBLE
+        btnEnroll.isEnabled = status == EnrollmentRules.Status.ALLOWED || joinsWaitlist
         btnEnroll.text = when (status) {
             EnrollmentRules.Status.ENDED -> getString(R.string.event_ended)
             EnrollmentRules.Status.IN_PROGRESS -> getString(R.string.in_progress)
             EnrollmentRules.Status.NOT_PUBLISHED -> getString(R.string.not_published)
             EnrollmentRules.Status.CLOSED -> getString(R.string.enrollments_closed)
             EnrollmentRules.Status.OTHER_COURSE -> getString(R.string.only_for_course, event.course)
-            EnrollmentRules.Status.SOLD_OUT -> getString(R.string.sold_out)
+            EnrollmentRules.Status.SOLD_OUT -> getString(if (joinsWaitlist) R.string.join_waitlist else R.string.sold_out)
             EnrollmentRules.Status.ALLOWED -> getString(R.string.enroll)
         }
         btnCancelEnrollment.isEnabled = true
@@ -519,6 +544,29 @@ class EventDetailsActivity : AppCompatActivity() {
                     showError(error)
                 }
             }
+    }
+
+    // entra no fim da fila (WaitlistRepository.join); as regras recusam se uma vaga abriu nesse meio-tempo
+    private fun joinWaitlist() {
+        btnEnroll.isEnabled = false
+        waitlistRepository.join(uid, eventId)
+            .addOnSuccessListener {
+                Toast.makeText(this, R.string.waitlist_joined, Toast.LENGTH_SHORT).show()
+                loadData()
+            }
+            .addOnFailureListener { error -> showError(error) }
+    }
+
+    private fun confirmLeaveWaitlist() {
+        confirm(R.string.leave_waitlist_question, R.string.leave_waitlist) {
+            btnLeaveWaitlist.isEnabled = false
+            waitlistRepository.leave(uid, eventId)
+                .addOnSuccessListener {
+                    Toast.makeText(this, R.string.waitlist_left, Toast.LENGTH_SHORT).show()
+                    loadData()
+                }
+                .addOnFailureListener { error -> showError(error) }
+        }
     }
 
     private fun confirmCancel() {

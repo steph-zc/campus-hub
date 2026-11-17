@@ -200,7 +200,34 @@
                 app:drawableStartCompat="@drawable/ic_check_circle"
                 app:drawableTint="@color/chip_open_text" />
 
-            <!-- só um dos dois botões fica visível, conforme o aluno está inscrito ou não -->
+            <!-- aluno na lista de espera de um evento lotado: posição na fila -->
+            <TextView
+                android:id="@+id/txtWaitlist"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:background="@drawable/bg_status_banner"
+                android:drawablePadding="12dp"
+                android:gravity="center_vertical"
+                android:padding="16dp"
+                android:textColor="@color/chip_closed_text"
+                android:textStyle="bold"
+                android:visibility="gone"
+                app:drawableStartCompat="@drawable/ic_schedule"
+                app:drawableTint="@color/chip_closed_text" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnLeaveWaitlist"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:layout_marginTop="12dp"
+                android:text="@string/leave_waitlist"
+                android:visibility="gone"
+                app:cornerRadius="12dp" />
+
+            <!-- só um dos dois botões fica visível, conforme o aluno está inscrito ou não;
+                 com o evento lotado, o de inscrever vira "Entrar na lista de espera" -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnEnroll"
                 android:layout_width="match_parent"

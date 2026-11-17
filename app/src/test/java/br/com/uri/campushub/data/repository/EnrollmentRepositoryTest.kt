@@ -35,6 +35,7 @@ class EnrollmentRepositoryTest {
     private val db = mockk<FirebaseFirestore>()
     private val eventRef = mockk<DocumentReference>()
     private val enrollmentRef = mockk<DocumentReference>()
+    private val waitlistRef = mockk<DocumentReference>()
     private val transaction = mockk<Transaction>(relaxed = true)
     private val eventSnapshot = mockk<DocumentSnapshot>()
     private val enrollmentSnapshot = mockk<DocumentSnapshot>()
@@ -44,6 +45,7 @@ class EnrollmentRepositoryTest {
     fun setUp() {
         every { db.collection("events").document("event-1") } returns eventRef
         every { db.collection("users").document("uid-ana").collection("enrollments").document("event-1") } returns enrollmentRef
+        every { eventRef.collection("waitlist").document("uid-ana") } returns waitlistRef
 
         // executa a função da transação com a Transaction falsa e devolve o resultado como Task
         every { db.runTransaction(any<Transaction.Function<Void?>>()) } answers {
@@ -97,6 +99,8 @@ class EnrollmentRepositoryTest {
         assertEquals("event-1", saved["eventId"])
         assertEquals(FieldValue.serverTimestamp(), saved["enrolledAt"])
         verify(exactly = 1) { transaction.update(eventRef, "enrolledCount", any()) }
+        // quem se inscreve sai da lista de espera na mesma transação
+        verify { transaction.delete(waitlistRef) }
     }
 
     // tocar duas vezes no botão não pode gastar duas vagas

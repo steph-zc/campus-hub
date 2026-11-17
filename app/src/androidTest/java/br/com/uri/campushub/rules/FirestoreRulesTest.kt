@@ -15,6 +15,7 @@ import br.com.uri.campushub.data.repository.FavoriteRepository
 import br.com.uri.campushub.data.repository.MediaRepository
 import br.com.uri.campushub.data.repository.RatingRepository
 import br.com.uri.campushub.data.repository.UserRepository
+import br.com.uri.campushub.data.repository.WaitlistRepository
 import br.com.uri.campushub.testing.EmulatorData.ADMIN_EMAIL
 import br.com.uri.campushub.testing.EmulatorData.createAdmin
 import br.com.uri.campushub.testing.EmulatorData.createOrganizer
@@ -30,7 +31,9 @@ import br.com.uri.campushub.testing.FirebaseEmulator
 import br.com.uri.campushub.testing.assertPermissionDenied
 import br.com.uri.campushub.testing.await
 import br.com.uri.campushub.testing.awaitError
+import com.google.firebase.Timestamp
 import com.google.firebase.firestore.FieldValue
+import java.util.Date
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -74,6 +77,7 @@ class FirestoreRulesTest {
     private val ratings = RatingRepository(db)
     private val media = MediaRepository(db)
     private val images = EventImageRepository(db)
+    private val waitlist = WaitlistRepository(db)
 
     private lateinit var anaUid: String
     private lateinit var betoUid: String
@@ -438,6 +442,54 @@ class FirestoreRulesTest {
 
         favorites.setFavorite(anaUid, OPEN, true).await()
         assertEquals(listOf(OPEN), favorites.getEventIds(anaUid).await())
+    }
+
+    // ---------- lista de espera ----------
+
+    private fun waitlistDoc(eventId: String, uid: String) =
+        db.collection("events").document(eventId).collection("waitlist").document(uid)
+
+    // só entra na fila de evento lotado, em nome próprio e com a hora do servidor;
+    // só sai a própria pessoa, e a hora de entrada não muda
+    @Test
+    fun waitlistIsOnlyForFullEventsAndForOneself() {
+        waitlist.join(anaUid, OPEN).assertPermissionDenied()
+        waitlist.join(betoUid, FULL).assertPermissionDenied()
+        waitlistDoc(FULL, anaUid).set(mapOf("joinedAt" to Timestamp(Date(0)))).assertPermissionDenied()
+
+        waitlist.join(anaUid, FULL).await()
+        assertEquals(1, waitlist.getPosition(anaUid, FULL).await())
+        waitlistDoc(FULL, anaUid).update("joinedAt", Timestamp(Date(0))).assertPermissionDenied()
+
+        signIn(BETO_EMAIL)
+        waitlist.leave(anaUid, FULL).assertPermissionDenied()
+        waitlist.join(betoUid, FULL).await()
+        assertEquals(2, waitlist.getPosition(betoUid, FULL).await())
+    }
+
+    // lotado, mas fechado por outro motivo: a fila é recusada (rascunho, inscrições encerradas,
+    // já começou, exclusivo de outro curso, ou o aluno já está inscrito)
+    @Test
+    fun waitlistRefusesEventsTheStudentCouldNotJoin() {
+        signIn(ADMIN_EMAIL)
+        saveEvents(mapOf(
+            "lotado-encerrado" to Event(title = "A", date = daysFromNow(7), capacity = 1, enrolledCount = 1,
+                status = EventStatus.CLOSED.value),
+            "lotado-rascunho" to Event(title = "B", date = daysFromNow(7), capacity = 1, enrolledCount = 1,
+                status = EventStatus.DRAFT.value),
+            "lotado-passado" to Event(title = "C", date = daysFromNow(-1), capacity = 1, enrolledCount = 1),
+            "lotado-direito" to Event(title = "D", date = daysFromNow(7), capacity = 1, enrolledCount = 1,
+                course = "Direito", openToAll = false),
+            "uma-vaga" to Event(title = "E", date = daysFromNow(7), capacity = 1)
+        ))
+        signIn(ANA_EMAIL)
+        for (id in listOf("lotado-encerrado", "lotado-rascunho", "lotado-passado", "lotado-direito")) {
+            waitlist.join(anaUid, id).assertPermissionDenied()
+        }
+
+        // a Ana pega a última vaga: o evento lota, mas ela já está inscrita
+        enrollments.enroll(anaUid, "uma-vaga").await()
+        waitlist.join(anaUid, "uma-vaga").assertPermissionDenied()
     }
 
     // ---------- comentários ----------

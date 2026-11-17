@@ -1,6 +1,7 @@
 package br.com.uri.campushub.e2e
 
 import android.content.Context
+import android.content.Intent
 import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.espresso.Espresso.closeSoftKeyboard
@@ -11,6 +12,7 @@ import androidx.test.espresso.Espresso.pressBack
 import androidx.test.espresso.action.ViewActions.click
 import androidx.test.espresso.action.ViewActions.replaceText
 import androidx.test.espresso.assertion.ViewAssertions.matches
+import androidx.test.espresso.matcher.RootMatchers.isDialog
 import androidx.test.espresso.matcher.ViewMatchers.Visibility
 import androidx.test.espresso.matcher.ViewMatchers.isEnabled
 import androidx.test.espresso.matcher.ViewMatchers.withContentDescription
@@ -23,6 +25,8 @@ import br.com.uri.campushub.data.model.Event
 import br.com.uri.campushub.data.repository.CommentRepository
 import br.com.uri.campushub.data.repository.EventRepository
 import br.com.uri.campushub.data.repository.FavoriteRepository
+import br.com.uri.campushub.data.repository.WaitlistRepository
+import br.com.uri.campushub.testing.EmulatorData.ADMIN_EMAIL
 import br.com.uri.campushub.testing.EmulatorData.PASSWORD
 import br.com.uri.campushub.testing.EmulatorData.createAdmin
 import br.com.uri.campushub.testing.EmulatorData.createStudent
@@ -34,6 +38,7 @@ import br.com.uri.campushub.testing.await
 import br.com.uri.campushub.testing.nestedScrollTo
 import br.com.uri.campushub.testing.waitFor
 import br.com.uri.campushub.ui.auth.MainActivity
+import br.com.uri.campushub.ui.details.EventDetailsActivity
 import org.hamcrest.Matchers.allOf
 import org.hamcrest.Matchers.equalTo
 import org.hamcrest.Matchers.instanceOf
@@ -167,5 +172,28 @@ class UserFlowTest {
         signIn(EMAIL)
         assertEquals(listOf(EVENT_ID), FavoriteRepository(db).getEventIds(uid).await())
         assertEquals(listOf(comment), CommentRepository(db).getAll(EVENT_ID).await().map { it.text })
+    }
+
+    // fluxo 3: evento lotado. A aluna entra na lista de espera pelos detalhes, vê a posição e sai da fila
+    @Test
+    fun studentJoinsAndLeavesTheWaitlistOfAFullEvent() {
+        signIn(ADMIN_EMAIL)
+        saveEvents(mapOf("lotado" to Event(title = "Lotado", date = daysFromNow(5), capacity = 1, enrolledCount = 1)))
+        val uid = createStudent(EMAIL, NAME, COURSE)
+        val intent = Intent(context, EventDetailsActivity::class.java)
+            .putExtra(EventDetailsActivity.EXTRA_EVENT_ID, "lotado")
+
+        ActivityScenario.launch<EventDetailsActivity>(intent).use {
+            waitFor(withId(R.id.btnEnroll), matches(withText(R.string.join_waitlist)))
+            onView(withId(R.id.btnEnroll)).perform(nestedScrollTo(), click())
+            waitFor(withId(R.id.txtWaitlist), matches(withText(context.getString(R.string.waitlist_position, 1))))
+
+            onView(withId(R.id.btnLeaveWaitlist)).perform(nestedScrollTo(), click())
+            // button1 = botão positivo do AlertDialog
+            onView(withId(android.R.id.button1)).inRoot(isDialog()).perform(click())
+            waitFor(withId(R.id.btnEnroll), matches(withText(R.string.join_waitlist)))
+        }
+
+        assertEquals(0, WaitlistRepository(db).getPosition(uid, "lotado").await())
     }
 }

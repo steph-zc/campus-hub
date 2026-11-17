@@ -8,7 +8,8 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreException
 
 // inscrições em users/{uid}/enrollments/{eventId} e o contador enrolledCount do evento
-// o id da inscrição é o id do evento, então cada aluno só tem uma por evento
+// o id da inscrição é o id do evento, então cada aluno só tem uma por evento.
+// Ao se inscrever, o aluno sai da lista de espera (events/{eventId}/waitlist/{uid}, WaitlistRepository)
 class EnrollmentRepository(private val db: FirebaseFirestore = FirebaseFirestore.getInstance()) {
 
     companion object {
@@ -27,6 +28,9 @@ class EnrollmentRepository(private val db: FirebaseFirestore = FirebaseFirestore
     }
 
     private fun eventDoc(eventId: String) = db.collection("events").document(eventId)
+
+    private fun waitlistDoc(uid: String, eventId: String) =
+        eventDoc(eventId).collection(WaitlistRepository.COLLECTION).document(uid)
 
     private fun enrollmentDoc(uid: String, eventId: String) =
         db.collection("users").document(uid).collection("enrollments").document(eventId)
@@ -66,6 +70,8 @@ class EnrollmentRepository(private val db: FirebaseFirestore = FirebaseFirestore
             )
             transaction.set(enrollmentRef, data)
             transaction.update(eventRef, "enrolledCount", FieldValue.increment(1))
+            // inscrito não precisa mais esperar: apagar um documento que não existe não dá erro
+            transaction.delete(waitlistDoc(uid, eventId))
             null
         }
     }

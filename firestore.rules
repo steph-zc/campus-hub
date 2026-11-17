@@ -314,6 +314,35 @@ service cloud.firestore {
       allow update: if isAdmin() || isEnrollmentCount(eventId) || isOwnEventEdit(eventId)
         || isOwnStatusChange();
 
+      // ---------- lista de espera: events/{eventId}/waitlist/{uid} ----------
+
+      // um documento por aluno na fila (id = uid), só com a hora do servidor em que ele entrou
+      match /waitlist/{uid} {
+        // a posição é calculada contando quem entrou antes (agregação count), então a fila é lida
+        // por qualquer conta logada; os documentos não têm nome nem email, só o uid e a hora
+        allow read: if signedIn();
+
+        // entrar: o próprio aluno, com a hora do servidor, num evento publicado, futuro,
+        // aberto ao curso dele e sem vaga (o mesmo que o WaitlistRules.canJoin no app),
+        // e só se ele ainda não estiver inscrito
+        allow create: if isOwner(uid)
+          && hasExactly(['joinedAt'])
+          && data().joinedAt == request.time
+          && statusOf(get(eventPath(eventId))) == 'published'
+          && isUpcoming(eventId)
+          && (get(eventPath(eventId)).data.openToAll
+              || get(eventPath(eventId)).data.course
+                   == get(/databases/$(database)/documents/users/$(uid)).data.course)
+          && get(eventPath(eventId)).data.enrolledCount >= get(eventPath(eventId)).data.capacity
+          && !exists(enrollmentPath(uid, eventId));
+
+        // sair da fila, ou sair junto com a própria inscrição (transação do EnrollmentRepository)
+        allow delete: if isOwner(uid);
+
+        // a hora de entrada não muda: quem sai e volta vai para o fim
+        allow update: if false;
+      }
+
       // ---------- comentários: events/{eventId}/comments/{commentId} ----------
 
       match /comments/{commentId} {
