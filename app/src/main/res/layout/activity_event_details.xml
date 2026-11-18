@@ -183,6 +183,18 @@
                 app:cornerRadius="12dp"
                 app:icon="@drawable/ic_check_circle" />
 
+            <!-- organizador dono: abre a lista de inscritos e da fila (AttendeesActivity) -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnAttendees"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:layout_marginTop="12dp"
+                android:text="@string/see_attendees"
+                android:visibility="gone"
+                app:cornerRadius="12dp"
+                app:icon="@drawable/ic_people" />
+
             <!-- aparece só para quem já está inscrito -->
             <TextView
                 android:id="@+id/txtEnrolled"

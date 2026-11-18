@@ -1,12 +1,14 @@
 package br.com.uri.campushub.rules
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import br.com.uri.campushub.data.model.Attendee
 import br.com.uri.campushub.data.model.Event
 import br.com.uri.campushub.data.model.EventImageChange
 import br.com.uri.campushub.data.model.EventStatus
 import br.com.uri.campushub.data.model.MediaPost
 import br.com.uri.campushub.data.model.Role
 import br.com.uri.campushub.data.model.User
+import br.com.uri.campushub.data.repository.AttendeeRepository
 import br.com.uri.campushub.data.repository.CommentRepository
 import br.com.uri.campushub.data.repository.EnrollmentRepository
 import br.com.uri.campushub.data.repository.EventImageRepository
@@ -78,6 +80,7 @@ class FirestoreRulesTest {
     private val media = MediaRepository(db)
     private val images = EventImageRepository(db)
     private val waitlist = WaitlistRepository(db)
+    private val attendees = AttendeeRepository(db)
 
     private lateinit var anaUid: String
     private lateinit var betoUid: String
@@ -580,6 +583,97 @@ class FirestoreRulesTest {
         events.update(id, eventDraft(capacity = 3)).await()
         assertEquals(2, waitlist.settle(id).await())
         assertEquals(3, events.get(id).await()?.enrolledCount)
+    }
+
+    // ---------- lista de inscritos do organizador ----------
+
+    private fun attendeeDoc(eventId: String, uid: String) =
+        db.collection("events").document(eventId).collection("attendees").document(uid)
+
+    // evento do Caio com 1 vaga: a Ana se inscreve e o Beto entra na fila
+    private fun organizerEventWithQueue(): String {
+        val caioUid = createOrganizer(CAIO_EMAIL, "Caio", "Direito")
+        val id = events.create(caioUid, eventDraft(capacity = 1)).await()
+        events.publish(id).await()
+        signIn(ANA_EMAIL)
+        enrollments.enroll(anaUid, id).await()
+        signIn(BETO_EMAIL)
+        waitlist.join(betoUid, id).await()
+        return id
+    }
+
+    // o organizador vê quem está inscrito e quem está na fila, com nome e curso do perfil;
+    // quando a vaga abre, o primeiro da fila passa para os inscritos
+    @Test
+    fun organizerFollowsEnrolledAndWaitingStudents() {
+        val id = organizerEventWithQueue()
+
+        signIn(CAIO_EMAIL)
+        val before = attendees.getAll(id).await().associateBy { it.userId }
+        assertEquals(Attendee(anaUid, "Ana", "Ciência da Computação", Attendee.ENROLLED), before[anaUid]?.copy(since = null))
+        assertEquals(Attendee.WAITING, before[betoUid]?.status)
+        assertEquals("Direito", before[betoUid]?.course)
+
+        signIn(ANA_EMAIL)
+        enrollments.cancel(anaUid, id).await()
+        assertEquals(1, waitlist.settle(id).await())
+
+        signIn(CAIO_EMAIL)
+        val after = attendees.getAll(id).await()
+        assertEquals(listOf(betoUid to Attendee.ENROLLED), after.map { it.userId to it.status })
+    }
+
+    // nomes e cursos dos inscritos só para o organizador dono: nem alunos nem outro organizador
+    // listam; o aluno lê só o próprio documento
+    @Test
+    fun onlyTheOwnerReadsTheAttendees() {
+        val id = organizerEventWithQueue()
+
+        signIn(ANA_EMAIL)
+        attendees.getAll(id).assertPermissionDenied()
+        assertEquals(Attendee.ENROLLED, attendeeDoc(id, anaUid).get().await().getString("status"))
+        attendeeDoc(id, betoUid).get().assertPermissionDenied()
+
+        createOrganizer("outro.org@campushub.test", "Outro", "Direito")
+        attendees.getAll(id).assertPermissionDenied()
+    }
+
+    // a lista não aceita dados inventados: sem inscrição, com nome diferente do perfil,
+    // em nome de outro aluno, inscrição sem entrar na lista, ou sair dela continuando inscrito
+    @Test
+    fun attendeeListCannotBeFaked() {
+        val profile = mapOf("name" to "Ana", "course" to "Ciência da Computação", "since" to FieldValue.serverTimestamp())
+        attendeeDoc(OPEN, anaUid).set(profile + ("status" to Attendee.ENROLLED)).assertPermissionDenied()
+        attendeeDoc(OPEN, anaUid).set(profile + ("status" to Attendee.WAITING)).assertPermissionDenied()
+        db.runBatch { batch ->
+            batch.set(enrollmentDoc(anaUid, OPEN), enrollmentData(OPEN))
+            batch.update(db.collection("events").document(OPEN), "enrolledCount", FieldValue.increment(1))
+        }.assertPermissionDenied()
+
+        enrollments.enroll(anaUid, OPEN).await()
+        attendeeDoc(OPEN, anaUid).set(profile + mapOf("status" to Attendee.ENROLLED, "name" to "Professora Ana"))
+            .assertPermissionDenied()
+        attendeeDoc(OPEN, anaUid).update("checkedInAt", FieldValue.serverTimestamp()).assertPermissionDenied()
+        attendeeDoc(OPEN, anaUid).delete().assertPermissionDenied()
+
+        signIn(BETO_EMAIL)
+        attendeeDoc(OPEN, anaUid).delete().assertPermissionDenied()
+        attendeeDoc(OPEN, betoUid).set(mapOf("name" to "Beto", "course" to "Direito", "status" to Attendee.ENROLLED,
+            "since" to FieldValue.serverTimestamp())).assertPermissionDenied()
+    }
+
+    // o aluno troca o nome no perfil: ao abrir o evento, o sync atualiza a lista e mantém a hora da inscrição
+    @Test
+    fun syncFollowsTheProfileName() {
+        enrollments.enroll(anaUid, OPEN).await()
+        val since = attendeeDoc(OPEN, anaUid).get().await().getTimestamp("since")
+        users.update(anaUid, "Ana Souza", "Ciência da Computação").await()
+
+        attendees.sync(anaUid, OPEN, users.get(anaUid).await()!!, isEnrolled = true, waitlistPosition = 0).await()
+
+        val saved = attendeeDoc(OPEN, anaUid).get().await()
+        assertEquals("Ana Souza", saved.getString("name"))
+        assertEquals(since, saved.getTimestamp("since"))
     }
 
     // ---------- comentários ----------

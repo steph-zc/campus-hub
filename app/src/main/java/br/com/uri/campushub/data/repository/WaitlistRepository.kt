@@ -1,7 +1,9 @@
 package br.com.uri.campushub.data.repository
 
+import br.com.uri.campushub.data.model.Attendee
 import br.com.uri.campushub.data.model.Event
 import br.com.uri.campushub.data.model.EventStatus
+import br.com.uri.campushub.data.model.User
 import com.google.android.gms.tasks.Task
 import com.google.android.gms.tasks.Tasks
 import com.google.firebase.firestore.AggregateSource
@@ -15,7 +17,10 @@ import java.util.Date
 //   O id é o uid, então cada aluno tem uma senha só;
 // - events/{eventId}/waitlistTickets/{ticket}: a senha apontando para o aluno (userId),
 //   para as regras do Firestore descobrirem quem é o primeiro da fila;
-// - no evento, waitlistNext (próxima senha a entregar) e waitlistHead (próxima a atender).
+// - no evento, waitlistNext (próxima senha a entregar) e waitlistHead (próxima a atender);
+// - events/{eventId}/attendees/{uid} (AttendeeRepository): o aluno aparece na fila da tela do organizador
+//   e passa para os inscritos quando é atendido. Lugares com hasAttendee = true têm esse documento;
+//   os de versões anteriores não, e o próprio aluno cria ao abrir o evento (AttendeeRepository.sync).
 // Quando uma vaga abre, settle() inscreve automaticamente o dono da senha waitlistHead.
 // Não há servidor próprio: quem roda o settle é o app de quem liberou a vaga (cancelamento ou aumento
 // de capacidade) ou de quem abrir o evento, e o firestore.rules confere cada passo
@@ -45,26 +50,32 @@ class WaitlistRepository(private val db: FirebaseFirestore = FirebaseFirestore.g
             .onSuccessTask { takeTicket(uid, eventId) }
     }
 
+    // lê o evento (senha da vez) e o perfil do aluno (nome e curso para a tela do organizador) e grava junto:
+    // o lugar, a senha, o contador e o aluno na fila da lista do organizador
     private fun takeTicket(uid: String, eventId: String): Task<Void?> =
         db.runTransaction { transaction ->
             val event = transaction.get(eventDoc(eventId)).toObject(Event::class.java)!!
+            val user = transaction.get(db.collection("users").document(uid)).toObject(User::class.java) ?: User()
             val ticket = event.waitlistNext
             transaction.set(
                 waitlist(eventId).document(uid),
-                mapOf("ticket" to ticket, "joinedAt" to FieldValue.serverTimestamp())
+                mapOf("ticket" to ticket, "joinedAt" to FieldValue.serverTimestamp(), "hasAttendee" to true)
             )
             transaction.set(ticketDoc(eventId, ticket), mapOf("userId" to uid))
             transaction.update(eventDoc(eventId), "waitlistNext", ticket + 1)
+            transaction.set(AttendeeRepository.doc(db, eventId, uid), AttendeeRepository.data(user, Attendee.WAITING))
             null
         }
 
-    // sai da fila: apaga o lugar e a senha juntos; a senha vira um buraco que o settle pula
+    // sai da fila: apaga o lugar, a senha e o aluno da lista do organizador juntos;
+    // a senha vira um buraco que o settle pula
     fun leave(uid: String, eventId: String): Task<Void> {
         val entry = waitlist(eventId).document(uid)
         return entry.get().onSuccessTask { snapshot ->
             val batch = db.batch()
             batch.delete(entry)
             snapshot.getLong("ticket")?.let { batch.delete(ticketDoc(eventId, it.toInt())) }
+            batch.delete(AttendeeRepository.doc(db, eventId, uid))
             batch.commit()
         }
     }
@@ -118,6 +129,11 @@ class WaitlistRepository(private val db: FirebaseFirestore = FirebaseFirestore.g
         }
         if (event.remainingSpots() == 0) return Step.DONE
 
+        // o lugar diz se o aluno tem documento na lista do organizador (lugares antigos não têm);
+        // lido antes das gravações, como a transação exige
+        val entryRef = waitlist(eventId).document(uid)
+        val hasAttendee = transaction.get(entryRef).getBoolean("hasAttendee") == true
+
         // inscreve o primeiro da fila: inscrição marcada como vinda da fila (para o aviso),
         // vaga ocupada, senha atendida e o aluno fora da fila, tudo junto
         val enrollmentRef = db.collection("users").document(uid).collection("enrollments").document(eventId)
@@ -130,7 +146,14 @@ class WaitlistRepository(private val db: FirebaseFirestore = FirebaseFirestore.g
             mapOf("enrolledCount" to event.enrolledCount + 1, "waitlistHead" to head + 1)
         )
         transaction.delete(ticketRef)
-        transaction.delete(waitlist(eventId).document(uid))
+        transaction.delete(entryRef)
+        // na tela do organizador, o aluno sai da fila e passa para os inscritos
+        if (hasAttendee) {
+            transaction.update(
+                AttendeeRepository.doc(db, eventId, uid),
+                mapOf("status" to Attendee.ENROLLED, "since" to FieldValue.serverTimestamp())
+            )
+        }
         return Step.PROMOTED
     }
 }

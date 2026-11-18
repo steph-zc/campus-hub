@@ -2,6 +2,7 @@ package br.com.uri.campushub.data.repository
 
 import br.com.uri.campushub.data.model.Event
 import br.com.uri.campushub.data.model.EventStatus
+import br.com.uri.campushub.data.model.User
 import br.com.uri.campushub.testing.TestEvents.event
 import br.com.uri.campushub.testing.await
 import br.com.uri.campushub.testing.awaitException
@@ -25,8 +26,9 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 
-// testes do EnrollmentRepository (data/repository): inscrições em users/{uid}/enrollments/{eventId}
-// e o contador enrolledCount do evento, alterados juntos numa transação do Firestore.
+// testes do EnrollmentRepository (data/repository): inscrições em users/{uid}/enrollments/{eventId},
+// o contador enrolledCount do evento e o aluno na lista do organizador (events/{eventId}/attendees/{uid}),
+// alterados juntos numa transação do Firestore.
 // O MockK simula o Firestore e a transação: a função passada ao runTransaction roda de verdade
 // com uma Transaction falsa, e o teste confere o que ela leu e gravou.
 @RunWith(RobolectricTestRunner::class)
@@ -38,6 +40,8 @@ class EnrollmentRepositoryTest {
     private val transaction = mockk<Transaction>(relaxed = true)
     private val eventSnapshot = mockk<DocumentSnapshot>()
     private val enrollmentSnapshot = mockk<DocumentSnapshot>()
+    private val attendeeRef = mockk<DocumentReference>()
+    private val userSnapshot = mockk<DocumentSnapshot>()
     private val repository = EnrollmentRepository(db)
 
     @Before
@@ -55,6 +59,13 @@ class EnrollmentRepositoryTest {
         }
         every { transaction.get(eventRef) } returns eventSnapshot
         every { transaction.get(enrollmentRef) } returns enrollmentSnapshot
+
+        // lista do organizador e perfil da Ana (nome e curso copiados para a lista).
+        // O perfil é o mesmo documento criado pelo encadeamento acima; lido fora do every
+        every { eventRef.collection("attendees").document("uid-ana") } returns attendeeRef
+        val userRef = db.collection("users").document("uid-ana")
+        every { transaction.get(userRef) } returns userSnapshot
+        every { userSnapshot.toObject(User::class.java) } returns User(name = "Ana", course = "Direito")
     }
 
     // evento como está no banco no momento da transação
@@ -97,6 +108,13 @@ class EnrollmentRepositoryTest {
         assertEquals("event-1", saved["eventId"])
         assertEquals(FieldValue.serverTimestamp(), saved["enrolledAt"])
         verify(exactly = 1) { transaction.update(eventRef, "enrolledCount", any()) }
+        // e entra como inscrita na lista do organizador, com o nome e o curso do perfil
+        verify {
+            transaction.set(
+                attendeeRef,
+                mapOf("name" to "Ana", "course" to "Direito", "status" to "enrolled", "since" to FieldValue.serverTimestamp())
+            )
+        }
     }
 
     // tocar duas vezes no botão não pode gastar duas vagas
@@ -180,6 +198,7 @@ class EnrollmentRepositoryTest {
 
         verify { transaction.delete(enrollmentRef) }
         verify(exactly = 1) { transaction.update(eventRef, "enrolledCount", any()) }
+        verify { transaction.delete(attendeeRef) }
     }
 
     // sem inscrição não há vaga para devolver; o contador não pode ficar menor que o real

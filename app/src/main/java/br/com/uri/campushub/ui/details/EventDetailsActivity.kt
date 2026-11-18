@@ -2,6 +2,7 @@ package br.com.uri.campushub.ui.details
 
 import android.content.Intent
 import android.os.Bundle
+import android.util.Log
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
@@ -21,6 +22,8 @@ import br.com.uri.campushub.R
 import br.com.uri.campushub.data.model.Comment
 import br.com.uri.campushub.data.model.Event
 import br.com.uri.campushub.data.model.EventStatus
+import br.com.uri.campushub.data.model.User
+import br.com.uri.campushub.data.repository.AttendeeRepository
 import br.com.uri.campushub.data.repository.AuthRepository
 import br.com.uri.campushub.data.repository.CommentRepository
 import br.com.uri.campushub.data.repository.EnrollmentRepository
@@ -39,6 +42,7 @@ import br.com.uri.campushub.ui.common.applySystemBarsPadding
 import br.com.uri.campushub.ui.common.setupToolbar
 import br.com.uri.campushub.ui.events.EventChips
 import br.com.uri.campushub.ui.media.MediaSection
+import br.com.uri.campushub.ui.organizer.AttendeesActivity
 import br.com.uri.campushub.ui.organizer.EventFormActivity
 import com.google.android.gms.tasks.Task
 import com.google.android.gms.tasks.Tasks
@@ -77,6 +81,7 @@ class EventDetailsActivity : AppCompatActivity() {
     private lateinit var btnPublish: MaterialButton
     private lateinit var btnCloseEnrollments: MaterialButton
     private lateinit var btnFinish: MaterialButton
+    private lateinit var btnAttendees: MaterialButton
     private lateinit var txtWaitlist: TextView
     private lateinit var btnLeaveWaitlist: MaterialButton
     private lateinit var btnEnroll: MaterialButton
@@ -103,6 +108,7 @@ class EventDetailsActivity : AppCompatActivity() {
     private val commentRepository = CommentRepository()
     private val ratingRepository = RatingRepository()
     private val waitlistRepository = WaitlistRepository()
+    private val attendeeRepository = AttendeeRepository()
 
     private lateinit var eventId: String
     private lateinit var uid: String
@@ -153,6 +159,7 @@ class EventDetailsActivity : AppCompatActivity() {
         btnPublish = findViewById(R.id.btnPublish)
         btnCloseEnrollments = findViewById(R.id.btnCloseEnrollments)
         btnFinish = findViewById(R.id.btnFinish)
+        btnAttendees = findViewById(R.id.btnAttendees)
         txtWaitlist = findViewById(R.id.txtWaitlist)
         btnLeaveWaitlist = findViewById(R.id.btnLeaveWaitlist)
         btnEnroll = findViewById(R.id.btnEnroll)
@@ -188,6 +195,12 @@ class EventDetailsActivity : AppCompatActivity() {
         btnPublish.setOnClickListener { confirmPublish() }
         btnCloseEnrollments.setOnClickListener { confirmCloseEnrollments() }
         btnFinish.setOnClickListener { confirmFinish() }
+        // lista de inscritos e da fila, só para o organizador dono (o botão só aparece para ele)
+        btnAttendees.setOnClickListener {
+            val intent = Intent(this, AttendeesActivity::class.java)
+            intent.putExtra(AttendeesActivity.EXTRA_EVENT_ID, eventId)
+            startActivity(intent)
+        }
         layoutComment.setEndIconOnClickListener { postComment() }
 
         // fromUser separa o toque do aluno de quando o código preenche a nota salva
@@ -322,6 +335,7 @@ class EventDetailsActivity : AppCompatActivity() {
                 showStatus(event, isOwner)
                 showRatingState(event, isEnrolled, myRating)
                 if (event.hasEnded()) loadRatingAverage()
+                syncAttendee(user, isEnrolled, waitlistTask.result)
             }
             .addOnFailureListener { error ->
                 if (isGone()) return@addOnFailureListener
@@ -473,6 +487,8 @@ class EventDetailsActivity : AppCompatActivity() {
         btnPublish.visibility = visibleIf(isOwner && OrganizerRules.canPublish(event))
         btnCloseEnrollments.visibility = visibleIf(isOwner && OrganizerRules.canCloseEnrollments(event))
         btnFinish.visibility = visibleIf(isOwner && OrganizerRules.canFinish(event))
+        // rascunho ainda não recebe inscrições; depois de publicado o dono acompanha os alunos
+        btnAttendees.visibility = visibleIf(isOwner && event.currentStatus() != EventStatus.DRAFT)
         btnPublish.isEnabled = true
         btnCloseEnrollments.isEnabled = true
         btnFinish.isEnabled = true
@@ -486,6 +502,15 @@ class EventDetailsActivity : AppCompatActivity() {
         }
         val time = CampusTime.formatter("HH:mm").format(availableAt)
         return getString(R.string.finish_available_at, time)
+    }
+
+    // inscrito ou na fila: confere o próprio documento na lista do organizador (AttendeeRepository.sync,
+    // Firestore) e cria ou corrige se preciso (inscrição de antes da lista existir, nome trocado no perfil).
+    // Roda em segundo plano; uma falha não atrapalha a tela e é tentada de novo na próxima abertura
+    private fun syncAttendee(user: User?, isEnrolled: Boolean, waitlistPosition: Int) {
+        if (user == null || (!isEnrolled && waitlistPosition == 0)) return
+        attendeeRepository.sync(uid, eventId, user, isEnrolled, waitlistPosition)
+            .addOnFailureListener { error -> Log.w("EventDetails", "sync da lista de inscritos falhou", error) }
     }
 
     private fun visibleIf(condition: Boolean) = if (condition) View.VISIBLE else View.GONE

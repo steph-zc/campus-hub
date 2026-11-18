@@ -1,7 +1,9 @@
 package br.com.uri.campushub.data.repository
 
+import br.com.uri.campushub.data.model.Attendee
 import br.com.uri.campushub.data.model.Event
 import br.com.uri.campushub.data.model.EventStatus
+import br.com.uri.campushub.data.model.User
 import com.google.android.gms.tasks.Task
 import com.google.android.gms.tasks.Tasks
 import com.google.firebase.firestore.FieldValue
@@ -10,6 +12,8 @@ import com.google.firebase.firestore.FirebaseFirestoreException
 
 // inscrições em users/{uid}/enrollments/{eventId} e o contador enrolledCount do evento
 // o id da inscrição é o id do evento, então cada aluno só tem uma por evento.
+// Junto vai o documento do aluno na lista do organizador (events/{eventId}/attendees/{uid},
+// AttendeeRepository), com o nome e o curso lidos do perfil users/{uid}.
 // Inscrições feitas pela lista de espera (WaitlistRepository.settle) vêm com fromWaitlist = true
 // até o aluno ver o aviso (takePromotionNotice)
 class EnrollmentRepository(private val db: FirebaseFirestore = FirebaseFirestore.getInstance()) {
@@ -47,10 +51,14 @@ class EnrollmentRepository(private val db: FirebaseFirestore = FirebaseFirestore
     fun enroll(uid: String, eventId: String): Task<Void?> {
         val eventRef = eventDoc(eventId)
         val enrollmentRef = enrollmentDoc(uid, eventId)
+        val userRef = db.collection("users").document(uid)
+        val attendeeRef = AttendeeRepository.doc(db, eventId, uid)
 
         return db.runTransaction { transaction ->
+            // a transação lê tudo antes de gravar: evento, inscrição e o perfil (nome e curso para o organizador)
             val event = transaction.get(eventRef).toObject(Event::class.java)!!
             val enrollment = transaction.get(enrollmentRef)
+            val user = transaction.get(userRef).toObject(User::class.java) ?: User()
 
             if (enrollment.exists()) {
                 return@runTransaction null
@@ -70,6 +78,7 @@ class EnrollmentRepository(private val db: FirebaseFirestore = FirebaseFirestore
             )
             transaction.set(enrollmentRef, data)
             transaction.update(eventRef, "enrolledCount", FieldValue.increment(1))
+            transaction.set(attendeeRef, AttendeeRepository.data(user, Attendee.ENROLLED))
             null
         }
     }
@@ -87,10 +96,12 @@ class EnrollmentRepository(private val db: FirebaseFirestore = FirebaseFirestore
         }
     }
 
-    // a vaga liberada vai para a lista de espera: depois de cancelar, a tela chama o WaitlistRepository.settle
+    // a vaga liberada vai para a lista de espera: depois de cancelar, a tela chama o WaitlistRepository.settle.
+    // O aluno sai da lista do organizador na mesma transação
     fun cancel(uid: String, eventId: String): Task<Void?> {
         val eventRef = eventDoc(eventId)
         val enrollmentRef = enrollmentDoc(uid, eventId)
+        val attendeeRef = AttendeeRepository.doc(db, eventId, uid)
 
         return db.runTransaction { transaction ->
             val enrollment = transaction.get(enrollmentRef)
@@ -99,6 +110,7 @@ class EnrollmentRepository(private val db: FirebaseFirestore = FirebaseFirestore
             if (enrollment.exists()) {
                 transaction.delete(enrollmentRef)
                 transaction.update(eventRef, "enrolledCount", FieldValue.increment(-1))
+                transaction.delete(attendeeRef)
             }
             null
         }

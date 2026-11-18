@@ -15,6 +15,7 @@ import androidx.test.espresso.action.ViewActions.click
 import androidx.test.espresso.action.ViewActions.replaceText
 import androidx.test.espresso.assertion.ViewAssertions.matches
 import androidx.test.espresso.matcher.RootMatchers.isDialog
+import androidx.test.espresso.matcher.ViewMatchers.isDisplayed
 import androidx.test.espresso.matcher.ViewMatchers.withId
 import androidx.test.espresso.matcher.ViewMatchers.withText
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -22,8 +23,12 @@ import br.com.uri.campushub.R
 import br.com.uri.campushub.data.media.JpegEncoder
 import br.com.uri.campushub.data.model.EventStatus
 import br.com.uri.campushub.data.repository.EventImageRepository
+import br.com.uri.campushub.data.repository.EnrollmentRepository
 import br.com.uri.campushub.data.repository.EventRepository
+import br.com.uri.campushub.data.repository.WaitlistRepository
 import br.com.uri.campushub.testing.EmulatorData.createOrganizer
+import br.com.uri.campushub.testing.EmulatorData.createStudent
+import br.com.uri.campushub.testing.EmulatorData.signIn
 import br.com.uri.campushub.testing.EmulatorData.eventDraft
 import br.com.uri.campushub.testing.FirebaseEmulator
 import br.com.uri.campushub.testing.await
@@ -66,6 +71,33 @@ class OrganizerFlowTest {
     private fun openForm() = ActivityScenario.launchActivityForResult<EventFormActivity>(
         Intent(context, EventFormActivity::class.java).putExtra(EventFormActivity.EXTRA_EVENT_ID, eventId)
     )
+
+    // o organizador abre "Ver inscritos" nos detalhes: o resumo e as duas seções mostram
+    // a aluna inscrita e o aluno na fila, com nome e curso
+    @Test
+    fun organizerSeesEnrolledAndWaitingStudents() {
+        val full = events.create(uid, eventDraft(title = "Oficina de Robótica", capacity = 1)).await()
+        events.publish(full).await()
+        val anaUid = createStudent("ana.lima@campushub.test", "Ana Lima", "Direito")
+        EnrollmentRepository(FirebaseEmulator.firestore).enroll(anaUid, full).await()
+        val betoUid = createStudent("beto.reis@campushub.test", "Beto Reis", "Medicina")
+        WaitlistRepository(FirebaseEmulator.firestore).join(betoUid, full).await()
+        signIn(ORGANIZER_EMAIL)
+
+        val intent = Intent(context, EventDetailsActivity::class.java).putExtra(EventDetailsActivity.EXTRA_EVENT_ID, full)
+        ActivityScenario.launch<EventDetailsActivity>(intent).use {
+            waitFor(withId(R.id.btnAttendees))
+            onView(withId(R.id.btnAttendees)).perform(nestedScrollTo(), click())
+
+            waitFor(withText("Inscritos (1)"))
+            onView(withText("Ana Lima")).check(matches(isDisplayed()))
+            onView(withText("Lista de espera (1)")).check(matches(isDisplayed()))
+            onView(withText("Beto Reis")).check(matches(isDisplayed()))
+            onView(withText("Medicina")).check(matches(isDisplayed()))
+            onView(withId(R.id.txtOccupied)).check(matches(withText("1/1")))
+            onView(withId(R.id.txtCheckins)).check(matches(withText("0/1")))
+        }
+    }
 
     // o organizador cola as coordenadas no campo de endereço, localiza no mapa e salva o ponto exato
     @Test

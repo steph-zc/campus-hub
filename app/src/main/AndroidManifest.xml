@@ -53,6 +53,11 @@
             android:theme="@style/Theme.CampusHub.NoActionBar" />
 
         <!-- formulário de criar e editar evento do organizador -->
+        <!-- inscritos e lista de espera de um evento, só para o organizador dono -->
+        <activity
+            android:name=".ui.organizer.AttendeesActivity"
+            android:theme="@style/Theme.CampusHub.NoActionBar" />
+
         <activity
             android:name=".ui.organizer.EventFormActivity"
             android:theme="@style/Theme.CampusHub.NoActionBar"
