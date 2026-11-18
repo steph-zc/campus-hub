@@ -160,6 +160,23 @@
     <string name="checkin_qr">QR Code de check-in</string>
     <string name="checkin_qr_hint">Mostre este código ao organizador na entrada do evento. Ele vale só para você.</string>
     <string name="close">Fechar</string>
+    <string name="checked_in_banner">Check-in feito em %1$s. Bom evento!</string>
+
+    <!-- leitura do QR pelo organizador (AttendeesActivity, CheckinResultDialog) -->
+    <string name="do_checkin">Fazer check-in</string>
+    <string name="scan_next">Ler próximo</string>
+    <string name="scanner_downloading">Baixando o leitor de QR. A câmera abre em seguida.</string>
+    <string name="scanner_unavailable_title">Leitor de QR indisponível</string>
+    <string name="scanner_unavailable">Não foi possível preparar o leitor de QR neste aparelho. Confira se ele está com internet e se tem a Play Store com uma conta Google conectada. Emuladores sem a Play Store não conseguem baixar o leitor.</string>
+    <string name="checkin_done_title">Check-in confirmado</string>
+    <string name="checkin_done">%1$s está presente.</string>
+    <string name="checkin_already_title">Check-in já feito</string>
+    <string name="checkin_already">%1$s já fez check-in às %2$s. O QR vale uma vez só.</string>
+    <string name="checkin_refused_title">QR não aceito</string>
+    <string name="checkin_not_enrolled">Este aluno não está inscrito no evento.</string>
+    <string name="checkin_wrong_code">Este QR não confere com a inscrição do aluno. Peça para ele abrir o QR pelo app.</string>
+    <string name="checkin_other_event">Este QR é de outro evento.</string>
+    <string name="checkin_not_a_code">Este não é um QR de check-in do CampusHub.</string>
 
     <!-- inscritos do evento, para o organizador (AttendeesActivity) -->
     <string name="attendees">Inscritos</string>

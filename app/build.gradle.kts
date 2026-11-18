@@ -79,6 +79,9 @@ dependencies {
     implementation(libs.glide)
     // ZXing core: gera (e, nos testes, lê) o QR Code de check-in no próprio aparelho, sem serviço externo
     implementation(libs.zxing.core)
+    // leitor de QR Code do Google Play Services: a tela da câmera é do sistema, então o app
+    // não pede permissão de câmera e recebe só o texto lido (gratuito, fora do Firebase)
+    implementation(libs.play.services.code.scanner)
     // testes unitários: JUnit 4, MockK (simula o Firebase) e Robolectric (simula o Android na JVM)
     testImplementation(libs.junit)
     testImplementation(libs.mockk)

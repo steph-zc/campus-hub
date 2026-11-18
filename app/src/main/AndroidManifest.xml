@@ -18,6 +18,12 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.CampusHub">
 
+        <!-- baixa o leitor de QR Code do Google Play Services junto com o app,
+             para a primeira leitura de check-in não esperar o download -->
+        <meta-data
+            android:name="com.google.mlkit.vision.DEPENDENCIES"
+            android:value="barcode_ui" />
+
         <activity
             android:name=".ui.auth.MainActivity"
             android:exported="true">

@@ -487,12 +487,15 @@ service cloud.firestore {
       // e a situação verdadeira depois da gravação: 'enrolled' com a inscrição existindo,
       // 'waiting' com o lugar na fila e sem inscrição. since é a hora do servidor, ou a já salva
       // quando a situação não muda (só o nome ou o curso foram atualizados).
-      // checkinToken é o segredo do QR de check-in: 32 dígitos hexadecimais (CheckinCode no app)
+      // checkinToken é o segredo do QR de check-in: 32 dígitos hexadecimais (CheckinCode no app).
+      // checkedInAt é do organizador: o aluno não cria, não muda e não apaga (o sync grava com merge)
       function isOwnAttendee(uid) {
         let profile = get(/databases/$(database)/documents/users/$(uid)).data;
         let enrolled = existsAfter(enrollmentPath(uid, eventId));
         return isOwner(uid)
-          && hasExactly(['name', 'course', 'status', 'since', 'checkinToken'])
+          && data().keys().hasAll(['name', 'course', 'status', 'since', 'checkinToken'])
+          && data().keys().hasOnly(['name', 'course', 'status', 'since', 'checkinToken', 'checkedInAt'])
+          && keepsCheckin()
           && data().checkinToken is string
           && data().checkinToken.matches('^[0-9a-f]{32}$')
           && data().name == profile.name
@@ -504,6 +507,24 @@ service cloud.firestore {
           && ((data().status == 'enrolled' && enrolled)
               || (data().status == 'waiting' && !enrolled
                   && existsAfter(waitlistEntryPath(eventId, uid))));
+      }
+
+      // o check-in salvo continua igual: nenhum antes da gravação e nenhum depois, ou o mesmo
+      function keepsCheckin() {
+        return (resource == null && !data().keys().hasAny(['checkedInAt']))
+          || (resource != null && data().get('checkedInAt', null) == resource.data.get('checkedInAt', null));
+      }
+
+      // check-in pelo organizador dono depois de ler o QR do aluno (AttendeeRepository.checkIn):
+      // só para inscrito, uma vez só, com a hora do servidor, e com o evento publicado ou
+      // com as inscrições encerradas (nem rascunho nem encerrado)
+      function isCheckin() {
+        return managesEvent()
+          && statusOf(get(eventPath(eventId))) in ['published', 'closed']
+          && resource.data.status == 'enrolled'
+          && resource.data.get('checkedInAt', null) == null
+          && changesOnly(['checkedInAt'])
+          && data().checkedInAt == request.time;
       }
 
       // inscrito pela fila (settle de qualquer conta): o documento passa de 'waiting' para 'enrolled'
@@ -525,10 +546,12 @@ service cloud.firestore {
         allow list: if managesEvent();
 
         allow create: if isOwnAttendee(uid);
-        allow update: if isOwnAttendee(uid) || isPromotedAttendee(uid);
+        allow update: if isOwnAttendee(uid) || isPromotedAttendee(uid) || isCheckin();
 
-        // sai da lista quando não está mais inscrito nem na fila (cancelar ou sair da fila)
+        // sai da lista quando não está mais inscrito nem na fila (cancelar ou sair da fila);
+        // depois do check-in o aluno já esteve no evento e não sai mais da lista
         allow delete: if isOwner(uid)
+          && (resource == null || resource.data.get('checkedInAt', null) == null)
           && !existsAfter(enrollmentPath(uid, eventId))
           && !existsAfter(waitlistEntryPath(eventId, uid));
       }

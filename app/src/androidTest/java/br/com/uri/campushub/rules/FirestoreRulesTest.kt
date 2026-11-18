@@ -19,6 +19,7 @@ import br.com.uri.campushub.data.repository.RatingRepository
 import br.com.uri.campushub.data.repository.UserRepository
 import br.com.uri.campushub.data.repository.WaitlistRepository
 import br.com.uri.campushub.domain.CheckinCode
+import br.com.uri.campushub.domain.CheckinRules
 import br.com.uri.campushub.testing.EmulatorData.ADMIN_EMAIL
 import br.com.uri.campushub.testing.EmulatorData.createAdmin
 import br.com.uri.campushub.testing.EmulatorData.createOrganizer
@@ -681,6 +682,72 @@ class FirestoreRulesTest {
         attendeeDoc(id, anaUid).get().assertPermissionDenied()
         signIn(CAIO_EMAIL)
         assertEquals(saved.getString("checkinToken"), attendees.getAll(id).await().first { it.userId == anaUid }.checkinToken)
+    }
+
+    // ---------- check-in ----------
+
+    // QR da Ana lido pelo organizador dono, com o segredo salvo na lista
+    private fun anaCode(eventId: String): CheckinCode.Payload {
+        signIn(ANA_EMAIL)
+        val token = attendeeDoc(eventId, anaUid).get().await().getString("checkinToken")!!
+        return CheckinCode.Payload(eventId, anaUid, token)
+    }
+
+    // o organizador dono registra o check-in uma vez, com a hora do servidor; a segunda leitura avisa
+    @Test
+    fun organizerChecksInOnce() {
+        val id = organizerEventWithQueue()
+        val code = anaCode(id)
+
+        signIn(CAIO_EMAIL)
+        assertEquals(CheckinRules.Outcome.Done("Ana"), attendees.checkIn(id, code).await())
+        val second = attendees.checkIn(id, code).await()
+        assertTrue(second is CheckinRules.Outcome.AlreadyDone)
+        assertEquals(CheckinRules.Outcome.WrongCode, attendees.checkIn(id, code.copy(token = CheckinCode.newToken())).await())
+        assertEquals(CheckinRules.Outcome.NotEnrolled, attendees.checkIn(id, code.copy(userId = betoUid)).await())
+    }
+
+    // ninguém além do organizador dono marca presença: nem o aluno, nem outro organizador;
+    // e o dono não inventa a hora, não marca quem está na fila nem refaz um check-in
+    @Test
+    fun checkinCannotBeFaked() {
+        val id = organizerEventWithQueue()
+        val now = mapOf("checkedInAt" to FieldValue.serverTimestamp())
+
+        signIn(ANA_EMAIL)
+        attendeeDoc(id, anaUid).update(now).assertPermissionDenied()
+        createOrganizer("outro.org@campushub.test", "Outro", "Direito")
+        attendeeDoc(id, anaUid).update(now).assertPermissionDenied()
+
+        signIn(CAIO_EMAIL)
+        attendeeDoc(id, anaUid).update("checkedInAt", Timestamp(Date(0))).assertPermissionDenied()
+        attendeeDoc(id, betoUid).update(now).assertPermissionDenied()
+        attendeeDoc(id, anaUid).update(now + ("name" to "Outra")).assertPermissionDenied()
+        attendeeDoc(id, anaUid).update(now).await()
+        attendeeDoc(id, anaUid).update(now).assertPermissionDenied()
+    }
+
+    // depois do check-in, o sync do aluno (nome trocado) não apaga a presença,
+    // e ele não consegue mais cancelar a inscrição
+    @Test
+    fun checkinSurvivesTheStudentApp() {
+        val id = organizerEventWithQueue()
+        val code = anaCode(id)
+        signIn(CAIO_EMAIL)
+        attendees.checkIn(id, code).await()
+
+        signIn(ANA_EMAIL)
+        users.update(anaUid, "Ana Souza", "Ciência da Computação").await()
+        val synced = attendees.sync(anaUid, id, users.get(anaUid).await()!!, isEnrolled = true, waitlistPosition = 0).await()
+        val saved = attendeeDoc(id, anaUid).get().await()
+        assertEquals("Ana Souza", saved.getString("name"))
+        assertEquals(saved.getTimestamp("checkedInAt"), synced?.checkedInAt)
+        assertTrue(saved.getTimestamp("checkedInAt") != null)
+
+        enrollments.cancel(anaUid, id).assertPermissionDenied()
+        attendeeDoc(id, anaUid).set(mapOf("name" to "Ana Souza", "course" to "Ciência da Computação",
+            "status" to Attendee.ENROLLED, "since" to FieldValue.serverTimestamp(), "checkinToken" to code.token))
+            .assertPermissionDenied()
     }
 
     // o aluno troca o nome no perfil: ao abrir o evento, o sync atualiza a lista e mantém a hora da inscrição

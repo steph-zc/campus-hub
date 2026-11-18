@@ -2,6 +2,8 @@ package br.com.uri.campushub.data.repository
 
 import br.com.uri.campushub.data.model.Attendee
 import br.com.uri.campushub.data.model.User
+import br.com.uri.campushub.domain.CheckinCode
+import br.com.uri.campushub.domain.CheckinRules
 import br.com.uri.campushub.testing.TestEvents.NOW
 import br.com.uri.campushub.testing.await
 import br.com.uri.campushub.testing.awaitException
@@ -13,6 +15,8 @@ import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.QuerySnapshot
+import com.google.firebase.firestore.SetOptions
+import com.google.firebase.firestore.Transaction
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
@@ -47,7 +51,7 @@ class AttendeeRepositoryTest {
     fun setUp() {
         every { db.collection("events").document("event-1").collection("attendees") } returns attendees
         every { attendees.document("uid-ana") } returns anaRef
-        every { anaRef.set(any()) } returns Tasks.forResult(null)
+        every { anaRef.set(any(), any<SetOptions>()) } returns Tasks.forResult(null)
         every { anaRef.delete() } returns Tasks.forResult(null)
     }
 
@@ -80,7 +84,7 @@ class AttendeeRepositoryTest {
 
         val synced = repository.sync("uid-ana", "event-1", ana, isEnrolled = true, waitlistPosition = 0).await()
 
-        verify { anaRef.set(fields("enrolled", FieldValue.serverTimestamp(), NEW_TOKEN)) }
+        verify { anaRef.set(fields("enrolled", FieldValue.serverTimestamp(), NEW_TOKEN), SetOptions.merge()) }
         assertEquals(Attendee("uid-ana", "Ana", "Direito", "enrolled", checkinToken = NEW_TOKEN), synced)
     }
 
@@ -93,7 +97,7 @@ class AttendeeRepositoryTest {
 
         repository.sync("uid-ana", "event-1", ana, isEnrolled = true, waitlistPosition = 0).await()
 
-        verify { anaRef.set(fields("enrolled", since, SAVED_TOKEN)) }
+        verify { anaRef.set(fields("enrolled", since, SAVED_TOKEN), SetOptions.merge()) }
     }
 
     // documento de antes do QR existir: ganha um segredo e mantém a hora da inscrição
@@ -104,7 +108,7 @@ class AttendeeRepositoryTest {
 
         repository.sync("uid-ana", "event-1", ana, isEnrolled = true, waitlistPosition = 0).await()
 
-        verify { anaRef.set(fields("enrolled", since, NEW_TOKEN)) }
+        verify { anaRef.set(fields("enrolled", since, NEW_TOKEN), SetOptions.merge()) }
     }
 
     // situação mudou (estava na fila, agora inscrita): a hora passa a ser a da inscrição
@@ -115,7 +119,7 @@ class AttendeeRepositoryTest {
 
         repository.sync("uid-ana", "event-1", ana, isEnrolled = true, waitlistPosition = 0).await()
 
-        verify { anaRef.set(fields("enrolled", FieldValue.serverTimestamp(), SAVED_TOKEN)) }
+        verify { anaRef.set(fields("enrolled", FieldValue.serverTimestamp(), SAVED_TOKEN), SetOptions.merge()) }
     }
 
     // nada mudou: não grava e devolve o documento salvo (com o segredo para o QR)
@@ -127,7 +131,7 @@ class AttendeeRepositoryTest {
         val synced = repository.sync("uid-ana", "event-1", ana, isEnrolled = false, waitlistPosition = 1).await()
 
         assertSame(saved, synced)
-        verify(exactly = 0) { anaRef.set(any()) }
+        verify(exactly = 0) { anaRef.set(any(), any<SetOptions>()) }
         verify(exactly = 0) { anaRef.delete() }
     }
 
@@ -140,11 +144,66 @@ class AttendeeRepositoryTest {
         verify { anaRef.delete() }
     }
 
+    // já tinha check-in: o sync devolve a hora salva (o merge não mexe nela)
+    @Test
+    fun `sync keeps the check-in`() {
+        val at = Timestamp(NOW)
+        savedInDatabase(Attendee(name = "Ana Antiga", course = "Direito", status = Attendee.ENROLLED,
+            checkedInAt = at, checkinToken = SAVED_TOKEN))
+
+        val synced = repository.sync("uid-ana", "event-1", ana, isEnrolled = true, waitlistPosition = 0).await()
+
+        assertEquals(at, synced?.checkedInAt)
+    }
+
+    // ---------- check-in pelo organizador ----------
+
+    // transação do check-in com o documento da Ana como está no banco (null = não existe)
+    private fun checkIn(saved: Attendee?, token: String = SAVED_TOKEN): Pair<CheckinRules.Outcome, Transaction> {
+        val transaction = mockk<Transaction>(relaxed = true)
+        val snapshot = mockk<DocumentSnapshot>()
+        every { transaction.get(anaRef) } returns snapshot
+        every { snapshot.exists() } returns (saved != null)
+        every { snapshot.toObject(Attendee::class.java) } returns saved
+        every { db.runTransaction(any<Transaction.Function<CheckinRules.Outcome>>()) } answers {
+            Tasks.forResult(firstArg<Transaction.Function<CheckinRules.Outcome>>().apply(transaction))
+        }
+        val outcome = repository.checkIn("event-1", CheckinCode.Payload("event-1", "uid-ana", token)).await()
+        return outcome to transaction
+    }
+
+    private val enrolledAna = Attendee(name = "Ana", course = "Direito", status = Attendee.ENROLLED, checkinToken = SAVED_TOKEN)
+
+    // QR certo e sem check-in ainda: grava a hora do servidor
+    @Test
+    fun `valid code checks the student in`() {
+        val (outcome, transaction) = checkIn(enrolledAna)
+
+        assertEquals(CheckinRules.Outcome.Done("Ana"), outcome)
+        verify { transaction.update(anaRef, "checkedInAt", FieldValue.serverTimestamp()) }
+    }
+
+    // segunda leitura, segredo errado ou aluno fora da lista: nada é gravado
+    @Test
+    fun `refused readings write nothing`() {
+        val at = Timestamp(NOW)
+        val cases = listOf(
+            checkIn(enrolledAna.copy(checkedInAt = at)) to CheckinRules.Outcome.AlreadyDone("Ana", at),
+            checkIn(enrolledAna, token = NEW_TOKEN) to CheckinRules.Outcome.WrongCode,
+            checkIn(null) to CheckinRules.Outcome.NotEnrolled
+        )
+        for ((result, expected) in cases) {
+            val (outcome, transaction) = result
+            assertEquals(expected, outcome)
+            verify(exactly = 0) { transaction.update(any<DocumentReference>(), any<String>(), any()) }
+        }
+    }
+
     // as regras recusaram a gravação: o erro chega a quem chamou
     @Test
     fun `sync reports a refused write`() {
         savedInDatabase(null)
-        every { anaRef.set(any()) } returns Tasks.forException(IllegalStateException("PERMISSION_DENIED"))
+        every { anaRef.set(any(), any<SetOptions>()) } returns Tasks.forException(IllegalStateException("PERMISSION_DENIED"))
 
         val error = repository.sync("uid-ana", "event-1", ana, isEnrolled = true, waitlistPosition = 0).awaitException()
 

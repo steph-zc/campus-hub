@@ -531,6 +531,12 @@ class EventDetailsActivity : AppCompatActivity() {
                 if (isGone()) return@addOnSuccessListener
                 myAttendee = attendee
                 btnCheckinQr.visibility = visibleIf(CheckinRules.canShowQr(event, attendee))
+                // check-in feito: o aviso mostra a hora e não dá mais para cancelar
+                // (as regras do Firestore também recusam)
+                attendee?.checkedInAt?.let { at ->
+                    txtEnrolled.text = getString(R.string.checked_in_banner, CampusTime.formatter("dd/MM 'às' HH:mm").format(at.toDate()))
+                    btnCancelEnrollment.visibility = View.GONE
+                }
             }
             .addOnFailureListener { error -> Log.w("EventDetails", "sync da lista de inscritos falhou", error) }
     }

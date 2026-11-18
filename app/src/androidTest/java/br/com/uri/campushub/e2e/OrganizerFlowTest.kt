@@ -15,7 +15,9 @@ import androidx.test.espresso.action.ViewActions.click
 import androidx.test.espresso.action.ViewActions.replaceText
 import androidx.test.espresso.assertion.ViewAssertions.matches
 import androidx.test.espresso.matcher.RootMatchers.isDialog
+import androidx.test.espresso.matcher.ViewMatchers.Visibility
 import androidx.test.espresso.matcher.ViewMatchers.isDisplayed
+import androidx.test.espresso.matcher.ViewMatchers.withEffectiveVisibility
 import androidx.test.espresso.matcher.ViewMatchers.withId
 import androidx.test.espresso.matcher.ViewMatchers.withText
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -34,7 +36,12 @@ import br.com.uri.campushub.testing.FirebaseEmulator
 import br.com.uri.campushub.testing.await
 import br.com.uri.campushub.testing.nestedScrollTo
 import br.com.uri.campushub.testing.waitFor
+import br.com.uri.campushub.domain.CheckinCode
+import br.com.uri.campushub.ui.checkin.GmsQrScanner
+import br.com.uri.campushub.ui.checkin.QrScanner
 import br.com.uri.campushub.ui.details.EventDetailsActivity
+import br.com.uri.campushub.ui.organizer.AttendeesActivity
+import org.hamcrest.Matchers.startsWith
 import br.com.uri.campushub.ui.organizer.EventFormActivity
 import com.google.firebase.firestore.GeoPoint
 import org.junit.Assert.assertEquals
@@ -96,6 +103,45 @@ class OrganizerFlowTest {
             onView(withText("Medicina")).check(matches(isDisplayed()))
             onView(withId(R.id.txtOccupied)).check(matches(withText("1/1")))
             onView(withId(R.id.txtCheckins)).check(matches(withText("0/1")))
+        }
+    }
+
+    // o organizador lê o QR da aluna (leitura simulada no lugar da câmera): o check-in é confirmado,
+    // a lista mostra "Presente" e, no app dela, o QR some e o aviso mostra o check-in
+    @Test
+    fun organizerScansTheStudentQrCode() {
+        val id = events.create(uid, eventDraft(title = "Oficina de Robótica")).await()
+        events.publish(id).await()
+        val anaUid = createStudent("ana.lima@campushub.test", "Ana Lima", "Direito")
+        EnrollmentRepository(FirebaseEmulator.firestore).enroll(anaUid, id).await()
+        val token = FirebaseEmulator.firestore.collection("events").document(id).collection("attendees")
+            .document(anaUid).get().await().getString("checkinToken")!!
+        signIn(ORGANIZER_EMAIL)
+
+        val code = CheckinCode.encode(id, anaUid, token)
+        AttendeesActivity.scannerFactory = { QrScanner { _, onCode, _ -> onCode(code) } }
+        try {
+            val intent = Intent(context, AttendeesActivity::class.java).putExtra(AttendeesActivity.EXTRA_EVENT_ID, id)
+            ActivityScenario.launch<AttendeesActivity>(intent).use {
+                waitFor(withId(R.id.fabCheckin))
+                onView(withId(R.id.fabCheckin)).perform(click())
+                waitFor(withText(R.string.checkin_done_title))
+                onView(withText("Ana Lima está presente.")).inRoot(isDialog()).check(matches(isDisplayed()))
+                onView(withText(R.string.close)).inRoot(isDialog()).perform(click())
+
+                waitFor(withId(R.id.txtCheckins), matches(withText("1/1")))
+                onView(withText(R.string.checked_in)).check(matches(isDisplayed()))
+            }
+        } finally {
+            AttendeesActivity.scannerFactory = { GmsQrScanner() }
+        }
+
+        signIn("ana.lima@campushub.test")
+        val details = Intent(context, EventDetailsActivity::class.java).putExtra(EventDetailsActivity.EXTRA_EVENT_ID, id)
+        ActivityScenario.launch<EventDetailsActivity>(details).use {
+            waitFor(withId(R.id.txtEnrolled), matches(withText(startsWith("Check-in feito em"))))
+            onView(withId(R.id.btnCheckinQr)).check(matches(withEffectiveVisibility(Visibility.GONE)))
+            onView(withId(R.id.btnCancelEnrollment)).check(matches(withEffectiveVisibility(Visibility.GONE)))
         }
     }
 

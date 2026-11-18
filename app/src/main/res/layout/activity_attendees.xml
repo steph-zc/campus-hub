@@ -42,4 +42,15 @@
         android:layout_height="wrap_content"
         android:layout_gravity="center" />
 
+    <!-- abre a câmera para ler o QR do aluno; só com o evento publicado ou com inscrições encerradas -->
+    <com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
+        android:id="@+id/fabCheckin"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|end"
+        android:layout_margin="16dp"
+        android:text="@string/do_checkin"
+        android:visibility="gone"
+        app:icon="@drawable/ic_qr_code" />
+
 </androidx.coordinatorlayout.widget.CoordinatorLayout>
