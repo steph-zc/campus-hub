@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <dimen name="list_padding">16dp</dimen>
+    <!-- espaço no fim de uma lista com botão flutuante (56dp do botão + margens) -->
+    <dimen name="fab_clearance">80dp</dimen>
 </resources>

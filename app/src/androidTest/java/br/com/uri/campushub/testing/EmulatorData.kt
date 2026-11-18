@@ -1,6 +1,7 @@
 package br.com.uri.campushub.testing
 
 import br.com.uri.campushub.data.model.Event
+import br.com.uri.campushub.data.model.EventDraft
 import br.com.uri.campushub.data.model.User
 import br.com.uri.campushub.data.repository.UserRepository
 import com.google.firebase.Timestamp
@@ -43,6 +44,13 @@ object EmulatorData {
         return uid
     }
 
+    // conta com perfil de aluno e organizers/{uid}, como o console faz; fica logada
+    fun createOrganizer(email: String, name: String, course: String): String {
+        val uid = createStudent(email, name, course)
+        FirebaseEmulator.makeOrganizer(uid)
+        return uid
+    }
+
     // grava eventos com ids fixos; precisa da conta admin logada
     fun saveEvents(events: Map<String, Event>) {
         db.runBatch { batch ->
@@ -55,6 +63,30 @@ object EmulatorData {
         signIn(ADMIN_EMAIL)
         db.collection("events").document(eventId).update("date", date).await()
     }
+
+    // formulário de evento do organizador, como a EventFormActivity monta (sem ponto no mapa)
+    fun eventDraft(
+        title: String = "Hackathon",
+        days: Int = 10,
+        capacity: Int = 30,
+        course: String = "Direito",
+        openToAll: Boolean = true
+    ) = EventDraft(
+        title = title,
+        description = "Maratona de programação no campus",
+        category = "Competição",
+        date = daysFromNow(days),
+        location = "Laboratório 3",
+        address = "Rua Batista Bonoto Sobrinho, 733 - Santiago - RS",
+        coordinates = null,
+        capacity = capacity,
+        course = course,
+        openToAll = openToAll
+    )
+
+    // horário relativo a agora em minutos (negativo = já começou), para a regra de "1 hora depois do início"
+    fun minutesFromNow(minutes: Int) =
+        Timestamp(Date(System.currentTimeMillis() + TimeUnit.MINUTES.toMillis(minutes.toLong())))
 
     fun daysFromNow(days: Int) =
         Timestamp(Date(System.currentTimeMillis() + TimeUnit.DAYS.toMillis(days.toLong())))

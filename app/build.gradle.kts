@@ -57,6 +57,9 @@ kover {
                 // o gravador de áudio depende do microfone, que não existe nos testes unitários
                 packages("br.com.uri.campushub.ui")
                 classes("br.com.uri.campushub.data.media.AudioRecorder")
+                // o ImageDecoder nativo não roda no Robolectric no Windows; o ImageCompressor é testado no
+                // aparelho (androidTest/data/media) e a compressão em si (JpegEncoder) nos testes unitários
+                classes("br.com.uri.campushub.data.media.ImageCompressor")
                 // classes geradas pelo build
                 classes("*.R", "*.R$*", "*.BuildConfig")
             }
@@ -74,6 +77,11 @@ dependencies {
     implementation(libs.firebase.firestore)
     implementation(libs.osmdroid)
     implementation(libs.glide)
+    // ZXing core: gera (e, nos testes, lê) o QR Code de check-in no próprio aparelho, sem serviço externo
+    implementation(libs.zxing.core)
+    // leitor de QR Code do Google Play Services: a tela da câmera é do sistema, então o app
+    // não pede permissão de câmera e recebe só o texto lido (gratuito, fora do Firebase)
+    implementation(libs.play.services.code.scanner)
     // testes unitários: JUnit 4, MockK (simula o Firebase) e Robolectric (simula o Android na JVM)
     testImplementation(libs.junit)
     testImplementation(libs.mockk)

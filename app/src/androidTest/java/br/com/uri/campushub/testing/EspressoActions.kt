@@ -45,8 +45,13 @@ fun waitFor(
     }
 }
 
-// rola a tela de detalhes (NestedScrollView) até a view aparecer;
-// o scrollTo() do Espresso só conhece o ScrollView comum
+// rola a tela (NestedScrollView) até a view ficar no meio da área visível;
+// o scrollTo() do Espresso só conhece o ScrollView comum.
+// As telas desenham atrás das barras do sistema e reservam o espaço delas com padding
+// (applySystemBarsPadding). Rolar só o mínimo (requestRectangleOnScreen) deixava a view colada
+// na borda de baixo, dentro da faixa de gestos da navegação: com o aparelho lento, o launcher
+// tratava o toque como gesto da barra e o clique não chegava ao app. Centralizar, descontando
+// o padding, mantém o toque longe das bordas
 fun nestedScrollTo(): ViewAction = object : ViewAction {
 
     override fun getConstraints(): Matcher<View> = allOf(
@@ -57,8 +62,20 @@ fun nestedScrollTo(): ViewAction = object : ViewAction {
     override fun getDescription() = "rolar o NestedScrollView até a view"
 
     override fun perform(uiController: UiController, view: View) {
-        // pede aos pais da view que mostrem esse retângulo; o NestedScrollView rola até ele
-        view.requestRectangleOnScreen(Rect(0, 0, view.width, view.height), true)
+        val scroll = nearestNestedScrollView(view)
+        // retângulo da view nas coordenadas do conteúdo do NestedScrollView
+        val rect = Rect(0, 0, view.width, view.height)
+        scroll.offsetDescendantRectToMyCoords(view, rect)
+        val visibleHeight = scroll.height - scroll.paddingTop - scroll.paddingBottom
+        val target = rect.centerY() - scroll.paddingTop - visibleHeight / 2
+        // o NestedScrollView limita sozinho ao fim do conteúdo
+        scroll.scrollTo(0, target.coerceAtLeast(0))
         uiController.loopMainThreadUntilIdle()
+    }
+
+    private fun nearestNestedScrollView(view: View): NestedScrollView {
+        var parent = view.parent
+        while (parent !is NestedScrollView) parent = parent.parent
+        return parent
     }
 }

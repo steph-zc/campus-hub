@@ -10,4 +10,18 @@
         android:visible="false"
         app:showAsAction="always" />
 
+    <!-- só para o organizador responsável (OrganizerRules.canManage) -->
+    <item
+        android:id="@+id/menuEditEvent"
+        android:title="@string/edit_event"
+        android:visible="false"
+        app:showAsAction="never" />
+
+    <!-- só para o organizador responsável e com o evento sem inscritos (OrganizerRules.canDelete) -->
+    <item
+        android:id="@+id/menuDeleteEvent"
+        android:title="@string/delete_event"
+        android:visible="false"
+        app:showAsAction="never" />
+
 </menu>

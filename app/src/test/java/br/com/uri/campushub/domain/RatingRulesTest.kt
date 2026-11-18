@@ -2,7 +2,9 @@ package br.com.uri.campushub.domain
 
 import br.com.uri.campushub.testing.TestEvents.NOW
 import br.com.uri.campushub.testing.TestEvents.TEN_YEARS_IN_DAYS
+import br.com.uri.campushub.data.model.EventStatus
 import br.com.uri.campushub.testing.TestEvents.event
+import br.com.uri.campushub.testing.TestEvents.startingInMinutes
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -25,6 +27,14 @@ class RatingRulesTest {
     @Test
     fun `event that did not happen yet cannot be rated`() {
         assertFalse(RatingRules.canRate(event(daysFromNow = 3), isEnrolled = true, now = NOW))
+    }
+
+    // evento de organizador: a avaliação só abre quando ele encerra, não no horário de início
+    @Test
+    fun `organizer event can be rated only after it is finished`() {
+        assertFalse(RatingRules.canRate(startingInMinutes(-120), isEnrolled = true, now = NOW))
+        val finished = startingInMinutes(-120, status = EventStatus.FINISHED)
+        assertTrue(RatingRules.canRate(finished, isEnrolled = true, now = NOW))
     }
 
     @Test

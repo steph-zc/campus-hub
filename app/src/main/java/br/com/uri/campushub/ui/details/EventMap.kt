@@ -17,8 +17,9 @@ import org.osmdroid.views.overlay.CopyrightOverlay
 import org.osmdroid.views.overlay.Marker
 import java.io.File
 
-// todo o código do mapa (OpenStreetMap, pela biblioteca osmdroid) fica aqui;
-// trocar de biblioteca no futuro mexe só neste arquivo e no layout
+// código do mapa (OpenStreetMap, pela biblioteca osmdroid) compartilhado pelas telas:
+// os detalhes do evento (show) e o seletor de ponto do organizador (ui/organizer/MapPointPicker);
+// trocar de biblioteca no futuro mexe só nesses arquivos e nos layouts
 object EventMap {
 
     // perto o bastante para distinguir os prédios, que ficam a 20-30 m um do outro
@@ -34,28 +35,34 @@ object EventMap {
         config.osmdroidTileCache = File(config.osmdroidBasePath, "tiles")
     }
 
-    @SuppressLint("ClickableViewAccessibility")
+    // ponto inicial quando o evento ainda não tem local marcado: o campus da URI em Santiago
+    val CAMPUS = GeoPoint(-29.1940761, -54.8869966)
+
+    // mapa (somente leitura) dos detalhes do evento
     fun show(map: MapView, event: Event) {
         val point = event.coordinates ?: return
         val center = GeoPoint(point.latitude, point.longitude)
 
+        prepare(map, center)
+        val marker = newPin(map, center)
+        marker.title = event.location
+        marker.snippet = event.address
+        map.overlays.add(marker)
+        map.invalidate()
+    }
+
+    // configuração comum aos mapas do app (detalhes e formulário do organizador):
+    // pedaços do OpenStreetMap, gestos de zoom, crédito da licença e a rolagem da tela sem roubar o toque
+    @SuppressLint("ClickableViewAccessibility")
+    fun prepare(map: MapView, center: GeoPoint) {
         map.setTileSource(TileSourceFactory.MAPNIK)
         map.setMultiTouchControls(true)
         map.controller.setZoom(ZOOM)
         map.controller.setCenter(center)
 
         map.overlays.clear()
-        val marker = Marker(map)
-        marker.position = center
-        // sem isso o osmdroid usa o marcador padrão dele, com o desenho de uma mão
-        marker.icon = ContextCompat.getDrawable(map.context, R.drawable.ic_map_pin)
-        marker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
-        marker.title = event.location
-        marker.snippet = event.address
-        map.overlays.add(marker)
         // a licença do OpenStreetMap pede o crédito visível no mapa
         map.overlays.add(CopyrightOverlay(map.context))
-        map.invalidate()
 
         // ao arrastar o mapa, a rolagem da tela não rouba o toque
         map.setOnTouchListener { view, motion ->
@@ -64,6 +71,16 @@ object EventMap {
             }
             false
         }
+    }
+
+    // marcador vermelho do app; quem chama decide se adiciona ao mapa e se ele pode ser arrastado
+    fun newPin(map: MapView, position: GeoPoint): Marker {
+        val marker = Marker(map)
+        marker.position = position
+        // sem isso o osmdroid usa o marcador padrão dele, com o desenho de uma mão
+        marker.icon = ContextCompat.getDrawable(map.context, R.drawable.ic_map_pin)
+        marker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+        return marker
     }
 
     // abre o ponto no app de mapas do celular; sem nenhum instalado, abre o site do OpenStreetMap

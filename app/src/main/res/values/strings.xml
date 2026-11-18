@@ -124,6 +124,121 @@
     <string name="cancel_enrollment_question">Cancelar sua inscrição neste evento?</string>
     <string name="keep_enrollment">Manter</string>
     <string name="my_events">Meus eventos</string>
+    <string name="organized_events">Eventos que organizo</string>
+    <string name="no_organized_events">Nenhum evento organizado ainda</string>
+    <string name="no_organized_events_hint">Toque em Novo evento para criar o primeiro.</string>
+
+    <!-- situação do evento: rascunho, publicado, inscrições encerradas e evento encerrado (EventStatus) -->
+    <string name="status_draft">Rascunho, ainda não publicado</string>
+    <string name="enrollments_closed">Inscrições encerradas</string>
+    <string name="not_published">Evento ainda não publicado</string>
+    <string name="draft_banner">Rascunho: só você vê este evento. Publique para os alunos poderem se inscrever.</string>
+    <string name="draft_past_banner">Rascunho com data que já passou. Edite a data para poder publicar.</string>
+    <string name="closed_banner">As inscrições deste evento foram encerradas pelo organizador.</string>
+    <string name="in_progress">Em andamento</string>
+    <string name="in_progress_banner">Evento em andamento.</string>
+    <string name="finish_available_at">Evento em andamento. O organizador pode encerrá-lo a partir de %1$s.</string>
+    <string name="finished_banner">Evento encerrado pelo organizador.</string>
+    <string name="finish_event">Encerrar evento</string>
+    <string name="finish_event_question">Encerrar o evento? Ele passa a constar como realizado, as avaliações são liberadas e nada mais pode ser alterado.</string>
+    <string name="event_finished">Evento encerrado</string>
+    <string name="delete_event">Excluir evento</string>
+    <string name="delete_event_question">Excluir o evento? Ele some para todos e isso não pode ser desfeito.</string>
+    <string name="event_deleted">Evento excluído</string>
+
+    <!-- lista de espera de eventos lotados (WaitlistRepository) -->
+    <string name="join_waitlist">Entrar na lista de espera</string>
+    <string name="leave_waitlist">Sair da lista de espera</string>
+    <string name="waitlist_position">Você está na lista de espera: %1$dº lugar.</string>
+    <string name="waitlist_joined">Você entrou na lista de espera</string>
+    <string name="waitlist_left">Você saiu da lista de espera</string>
+    <string name="leave_waitlist_question">Sair da lista de espera? Se voltar depois, você vai para o fim da fila.</string>
+    <string name="promoted_banner">Uma vaga abriu e você foi inscrito pela lista de espera!</string>
+
+    <!-- QR Code de check-in do aluno inscrito (CheckinQrDialog) -->
+    <string name="my_checkin_qr">Meu QR de check-in</string>
+    <string name="checkin_qr">QR Code de check-in</string>
+    <string name="checkin_qr_hint">Mostre este código ao organizador na entrada do evento. Ele vale só para você.</string>
+    <string name="close">Fechar</string>
+    <string name="checked_in_banner">Check-in feito em %1$s. Bom evento!</string>
+
+    <!-- leitura do QR pelo organizador (AttendeesActivity, CheckinResultDialog) -->
+    <string name="do_checkin">Fazer check-in</string>
+    <string name="scan_next">Ler próximo</string>
+    <string name="scanner_downloading">Baixando o leitor de QR. A câmera abre em seguida.</string>
+    <string name="scanner_unavailable_title">Leitor de QR indisponível</string>
+    <string name="scanner_unavailable">Não foi possível preparar o leitor de QR neste aparelho. Confira se ele está com internet e se tem a Play Store com uma conta Google conectada. Emuladores sem a Play Store não conseguem baixar o leitor.</string>
+    <string name="checkin_done_title">Check-in confirmado</string>
+    <string name="checkin_done">%1$s está presente.</string>
+    <string name="checkin_already_title">Check-in já feito</string>
+    <string name="checkin_already">%1$s já fez check-in às %2$s. O QR vale uma vez só.</string>
+    <string name="checkin_refused_title">QR não aceito</string>
+    <string name="checkin_not_enrolled">Este aluno não está inscrito no evento.</string>
+    <string name="checkin_wrong_code">Este QR não confere com a inscrição do aluno. Peça para ele abrir o QR pelo app.</string>
+    <string name="checkin_other_event">Este QR é de outro evento.</string>
+    <string name="checkin_not_a_code">Este não é um QR de check-in do CampusHub.</string>
+
+    <!-- inscritos do evento, para o organizador (AttendeesActivity) -->
+    <string name="attendees">Inscritos</string>
+    <string name="see_attendees">Ver inscritos</string>
+    <string name="occupied_spots">Vagas ocupadas</string>
+    <string name="checkins">Check-ins</string>
+    <string name="waitlist">Lista de espera</string>
+    <string name="count_of_total">%1$d/%2$d</string>
+    <string name="enrolled_section">Inscritos (%1$d)</string>
+    <string name="waitlist_section">Lista de espera (%1$d)</string>
+    <string name="no_attendees">Nenhum aluno inscrito ainda</string>
+    <string name="no_attendees_hint">Os alunos aparecem aqui assim que se inscreverem ou entrarem na lista de espera.</string>
+    <string name="attendee_enrolled_at">Inscrito em %1$s</string>
+    <string name="attendee_waiting_since">Na fila desde %1$s</string>
+    <string name="checked_in">Presente</string>
+    <string name="not_checked_in">Aguardando</string>
+    <string name="queue_position">%1$dº</string>
+    <string name="unlisted_attendees">%1$d inscrição(ões) anterior(es) à lista ainda não aparece(m): o aluno entra aqui quando abrir o evento no app.</string>
+    <string name="publish_event">Publicar evento</string>
+    <string name="close_enrollments">Encerrar inscrições</string>
+    <string name="publish_event_question">Publicar o evento? Ele passa a aparecer para todos os alunos e não volta a ser rascunho.</string>
+    <string name="close_enrollments_question">Encerrar as inscrições? Ninguém mais vai conseguir se inscrever, e isso não pode ser desfeito.</string>
+    <string name="event_published">Evento publicado</string>
+    <string name="enrollments_closed_done">Inscrições encerradas</string>
+
+    <!-- formulário de evento do organizador (EventFormActivity) -->
+    <string name="new_event">Novo evento</string>
+    <string name="edit_event">Editar evento</string>
+    <string name="event_title">Título</string>
+    <string name="event_description">Descrição</string>
+    <string name="event_category">Categoria</string>
+    <string name="when_and_where">Quando e onde</string>
+    <string name="event_date">Data</string>
+    <string name="event_time">Hora</string>
+    <string name="event_location">Local no campus (opcional)</string>
+    <string name="event_location_hint">Sala, auditório ou laboratório</string>
+    <string name="event_address">Endereço</string>
+    <string name="event_address_hint">Ou cole as coordenadas (latitude, longitude)</string>
+    <string name="event_image">Imagem do evento</string>
+    <string name="no_event_image">Nenhuma imagem escolhida</string>
+    <string name="pick_image">Escolher imagem</string>
+    <string name="change_image">Trocar imagem</string>
+    <string name="remove_image">Remover</string>
+    <string name="image_error">Não foi possível usar essa imagem</string>
+    <string name="find_on_map">Localizar no mapa</string>
+    <string name="map_point">Ponto no mapa</string>
+    <string name="map_point_hint">Toque no mapa ou arraste o marcador até o local exato</string>
+    <string name="map_point_none">Sem ponto no mapa</string>
+    <string name="remove_map_point">Remover ponto</string>
+    <string name="address_not_found">Endereço não encontrado. Toque no mapa para marcar o ponto.</string>
+    <string name="spots_and_audience">Vagas e público</string>
+    <string name="event_capacity">Capacidade máxima</string>
+    <string name="exclusive_for_course">Exclusivo para alunos de %1$s</string>
+    <string name="save_event">Salvar evento</string>
+    <string name="event_created">Evento criado!</string>
+    <string name="event_updated">Evento atualizado!</string>
+    <string name="not_event_organizer">Só o organizador responsável pode editar este evento</string>
+    <string name="event_fill_required">Preencha título, descrição, categoria, data, endereço e capacidade</string>
+    <string name="event_text_too_long">Algum campo passou do tamanho máximo</string>
+    <string name="event_past_date">Escolha uma data e hora que ainda não passaram</string>
+    <string name="event_invalid_capacity">A capacidade deve ser de 1 a %1$d vagas</string>
+    <string name="event_capacity_below_enrolled">A capacidade não pode ficar abaixo dos %1$d alunos já inscritos</string>
     <string name="no_enrollments">Nenhuma inscrição ainda</string>
     <string name="no_enrollments_hint">Os eventos em que você se inscrever vão aparecer aqui.</string>
     <string name="browse_events">Ver eventos</string>

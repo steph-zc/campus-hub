@@ -1,6 +1,8 @@
 package br.com.uri.campushub.testing
 
 import br.com.uri.campushub.data.model.Event
+import br.com.uri.campushub.data.model.EventStatus
+import br.com.uri.campushub.domain.CampusTime
 import com.google.firebase.Timestamp
 import java.util.Calendar
 import java.util.Date
@@ -13,17 +15,22 @@ object TestEvents {
     val NOW: Date = date(2026, Calendar.OCTOBER, 15, 12, 0)
 
     fun date(year: Int, month: Int, day: Int, hour: Int, minute: Int): Date =
-        Calendar.getInstance().apply {
+        CampusTime.calendar().apply {
             clear()
             set(year, month, day, hour, minute)
         }.time
 
     // dia relativo ao NOW: negativo = já aconteceu, positivo = ainda vai acontecer
     fun daysFromNow(days: Int): Date =
-        Calendar.getInstance().apply {
+        CampusTime.calendar().apply {
             time = NOW
             add(Calendar.DAY_OF_MONTH, days)
         }.time
+
+    // evento que começa "minutes" minutos depois do NOW (negativo = já começou)
+    fun startingInMinutes(minutes: Int, organizerId: String = "uid-caio", status: EventStatus = EventStatus.PUBLISHED) =
+        event(organizerId = organizerId, status = status)
+            .copy(date = Timestamp(Date(NOW.time + minutes * 60_000L)))
 
     // distância grande o bastante para um evento ser "passado" ou "futuro" no relógio real;
     // usada nos testes das funções chamadas sem o parâmetro "now", como as telas fazem
@@ -38,7 +45,9 @@ object TestEvents {
         enrolledCount: Int = 0,
         course: String = "Ciência da Computação",
         openToAll: Boolean = true,
-        category: String = "Palestra"
+        category: String = "Palestra",
+        organizerId: String = "",
+        status: EventStatus = EventStatus.PUBLISHED
     ) = Event(
         id = id,
         title = title,
@@ -47,6 +56,8 @@ object TestEvents {
         enrolledCount = enrolledCount,
         course = course,
         openToAll = openToAll,
-        category = category
+        category = category,
+        organizerId = organizerId,
+        status = status.value
     )
 }
