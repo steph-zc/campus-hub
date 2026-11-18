@@ -4,6 +4,7 @@ import br.com.uri.campushub.data.model.Attendee
 import br.com.uri.campushub.data.model.Event
 import br.com.uri.campushub.data.model.EventStatus
 import br.com.uri.campushub.data.model.User
+import br.com.uri.campushub.domain.CheckinCode
 import com.google.android.gms.tasks.Task
 import com.google.android.gms.tasks.Tasks
 import com.google.firebase.firestore.FieldValue
@@ -16,7 +17,11 @@ import com.google.firebase.firestore.FirebaseFirestoreException
 // AttendeeRepository), com o nome e o curso lidos do perfil users/{uid}.
 // Inscrições feitas pela lista de espera (WaitlistRepository.settle) vêm com fromWaitlist = true
 // até o aluno ver o aviso (takePromotionNotice)
-class EnrollmentRepository(private val db: FirebaseFirestore = FirebaseFirestore.getInstance()) {
+// newToken gera o segredo do QR de check-in (CheckinCode); injetável para os testes
+class EnrollmentRepository(
+    private val db: FirebaseFirestore = FirebaseFirestore.getInstance(),
+    private val newToken: () -> String = { CheckinCode.newToken() }
+) {
 
     companion object {
         private const val SOLD_OUT = "sold_out"
@@ -78,7 +83,7 @@ class EnrollmentRepository(private val db: FirebaseFirestore = FirebaseFirestore
             )
             transaction.set(enrollmentRef, data)
             transaction.update(eventRef, "enrolledCount", FieldValue.increment(1))
-            transaction.set(attendeeRef, AttendeeRepository.data(user, Attendee.ENROLLED))
+            transaction.set(attendeeRef, AttendeeRepository.data(user, Attendee.ENROLLED, newToken()))
             null
         }
     }

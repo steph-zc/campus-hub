@@ -18,7 +18,9 @@ data class Attendee(
     // quando entrou na situação atual (inscrição ou fila), pela hora do servidor
     val since: Timestamp? = null,
     // preenchido no check-in pelo organizador; null = ainda não chegou
-    val checkedInAt: Timestamp? = null
+    val checkedInAt: Timestamp? = null,
+    // segredo do QR Code de check-in do aluno (CheckinCode); só ele e o organizador dono leem
+    val checkinToken: String = ""
 ) {
     companion object {
         const val ENROLLED = "enrolled"

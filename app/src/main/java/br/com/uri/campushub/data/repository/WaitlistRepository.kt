@@ -4,6 +4,7 @@ import br.com.uri.campushub.data.model.Attendee
 import br.com.uri.campushub.data.model.Event
 import br.com.uri.campushub.data.model.EventStatus
 import br.com.uri.campushub.data.model.User
+import br.com.uri.campushub.domain.CheckinCode
 import com.google.android.gms.tasks.Task
 import com.google.android.gms.tasks.Tasks
 import com.google.firebase.firestore.AggregateSource
@@ -24,7 +25,12 @@ import java.util.Date
 // Quando uma vaga abre, settle() inscreve automaticamente o dono da senha waitlistHead.
 // Não há servidor próprio: quem roda o settle é o app de quem liberou a vaga (cancelamento ou aumento
 // de capacidade) ou de quem abrir o evento, e o firestore.rules confere cada passo
-class WaitlistRepository(private val db: FirebaseFirestore = FirebaseFirestore.getInstance()) {
+// newToken gera o segredo do QR de check-in (CheckinCode), que o aluno usa se for inscrito pela fila;
+// injetável para os testes
+class WaitlistRepository(
+    private val db: FirebaseFirestore = FirebaseFirestore.getInstance(),
+    private val newToken: () -> String = { CheckinCode.newToken() }
+) {
 
     companion object {
         const val COLLECTION = "waitlist"
@@ -63,7 +69,7 @@ class WaitlistRepository(private val db: FirebaseFirestore = FirebaseFirestore.g
             )
             transaction.set(ticketDoc(eventId, ticket), mapOf("userId" to uid))
             transaction.update(eventDoc(eventId), "waitlistNext", ticket + 1)
-            transaction.set(AttendeeRepository.doc(db, eventId, uid), AttendeeRepository.data(user, Attendee.WAITING))
+            transaction.set(AttendeeRepository.doc(db, eventId, uid), AttendeeRepository.data(user, Attendee.WAITING, newToken()))
             null
         }
 

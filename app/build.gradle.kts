@@ -77,6 +77,8 @@ dependencies {
     implementation(libs.firebase.firestore)
     implementation(libs.osmdroid)
     implementation(libs.glide)
+    // ZXing core: gera (e, nos testes, lê) o QR Code de check-in no próprio aparelho, sem serviço externo
+    implementation(libs.zxing.core)
     // testes unitários: JUnit 4, MockK (simula o Firebase) e Robolectric (simula o Android na JVM)
     testImplementation(libs.junit)
     testImplementation(libs.mockk)

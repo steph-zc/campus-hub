@@ -44,7 +44,8 @@ class WaitlistRepositoryTest {
     private val users = mockk<CollectionReference>()
     private val transaction = mockk<Transaction>(relaxed = true)
     private val eventSnapshot = mockk<DocumentSnapshot>()
-    private val repository = WaitlistRepository(db)
+    // segredo do QR fixo, no lugar do gerado ao acaso
+    private val repository = WaitlistRepository(db) { "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" }
 
     // documentos das senhas e das inscrições criados sob demanda e guardados para o verify
     private val ticketRefs = mutableMapOf<String, DocumentReference>()
@@ -146,7 +147,8 @@ class WaitlistRepositoryTest {
         verify {
             transaction.set(
                 anaAttendee,
-                mapOf("name" to "Ana", "course" to "Direito", "status" to "waiting", "since" to FieldValue.serverTimestamp())
+                mapOf("name" to "Ana", "course" to "Direito", "status" to "waiting", "since" to FieldValue.serverTimestamp(),
+                    "checkinToken" to "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
             )
         }
     }

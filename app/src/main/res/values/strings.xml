@@ -155,6 +155,12 @@
     <string name="leave_waitlist_question">Sair da lista de espera? Se voltar depois, você vai para o fim da fila.</string>
     <string name="promoted_banner">Uma vaga abriu e você foi inscrito pela lista de espera!</string>
 
+    <!-- QR Code de check-in do aluno inscrito (CheckinQrDialog) -->
+    <string name="my_checkin_qr">Meu QR de check-in</string>
+    <string name="checkin_qr">QR Code de check-in</string>
+    <string name="checkin_qr_hint">Mostre este código ao organizador na entrada do evento. Ele vale só para você.</string>
+    <string name="close">Fechar</string>
+
     <!-- inscritos do evento, para o organizador (AttendeesActivity) -->
     <string name="attendees">Inscritos</string>
     <string name="see_attendees">Ver inscritos</string>

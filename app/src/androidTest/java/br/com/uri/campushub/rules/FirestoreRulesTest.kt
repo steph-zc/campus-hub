@@ -18,6 +18,7 @@ import br.com.uri.campushub.data.repository.MediaRepository
 import br.com.uri.campushub.data.repository.RatingRepository
 import br.com.uri.campushub.data.repository.UserRepository
 import br.com.uri.campushub.data.repository.WaitlistRepository
+import br.com.uri.campushub.domain.CheckinCode
 import br.com.uri.campushub.testing.EmulatorData.ADMIN_EMAIL
 import br.com.uri.campushub.testing.EmulatorData.createAdmin
 import br.com.uri.campushub.testing.EmulatorData.createOrganizer
@@ -610,7 +611,7 @@ class FirestoreRulesTest {
 
         signIn(CAIO_EMAIL)
         val before = attendees.getAll(id).await().associateBy { it.userId }
-        assertEquals(Attendee(anaUid, "Ana", "Ciência da Computação", Attendee.ENROLLED), before[anaUid]?.copy(since = null))
+        assertEquals(Attendee(anaUid, "Ana", "Ciência da Computação", Attendee.ENROLLED), before[anaUid]?.copy(since = null, checkinToken = ""))
         assertEquals(Attendee.WAITING, before[betoUid]?.status)
         assertEquals("Direito", before[betoUid]?.course)
 
@@ -642,7 +643,8 @@ class FirestoreRulesTest {
     // em nome de outro aluno, inscrição sem entrar na lista, ou sair dela continuando inscrito
     @Test
     fun attendeeListCannotBeFaked() {
-        val profile = mapOf("name" to "Ana", "course" to "Ciência da Computação", "since" to FieldValue.serverTimestamp())
+        val profile = mapOf("name" to "Ana", "course" to "Ciência da Computação", "since" to FieldValue.serverTimestamp(),
+            "checkinToken" to CheckinCode.newToken())
         attendeeDoc(OPEN, anaUid).set(profile + ("status" to Attendee.ENROLLED)).assertPermissionDenied()
         attendeeDoc(OPEN, anaUid).set(profile + ("status" to Attendee.WAITING)).assertPermissionDenied()
         db.runBatch { batch ->
@@ -662,11 +664,32 @@ class FirestoreRulesTest {
             "since" to FieldValue.serverTimestamp())).assertPermissionDenied()
     }
 
+    // o segredo do QR é criado na inscrição, fica com o aluno e o organizador dono,
+    // e só é aceito no formato certo (32 dígitos hexadecimais)
+    @Test
+    fun checkinSecretIsWellFormedAndPrivate() {
+        val id = organizerEventWithQueue()
+
+        signIn(ANA_EMAIL)
+        val saved = attendeeDoc(id, anaUid).get().await()
+        assertTrue(CheckinCode.isValidToken(saved.getString("checkinToken")!!))
+        attendeeDoc(id, anaUid).update("checkinToken", "123").assertPermissionDenied()
+        attendeeDoc(id, anaUid).update("checkinToken", FieldValue.delete()).assertPermissionDenied()
+
+        // outro aluno não lê o segredo da Ana; o organizador dono lê (para conferir o QR)
+        signIn(BETO_EMAIL)
+        attendeeDoc(id, anaUid).get().assertPermissionDenied()
+        signIn(CAIO_EMAIL)
+        assertEquals(saved.getString("checkinToken"), attendees.getAll(id).await().first { it.userId == anaUid }.checkinToken)
+    }
+
     // o aluno troca o nome no perfil: ao abrir o evento, o sync atualiza a lista e mantém a hora da inscrição
     @Test
     fun syncFollowsTheProfileName() {
         enrollments.enroll(anaUid, OPEN).await()
-        val since = attendeeDoc(OPEN, anaUid).get().await().getTimestamp("since")
+        val before = attendeeDoc(OPEN, anaUid).get().await()
+        val since = before.getTimestamp("since")
+        val token = before.getString("checkinToken")
         users.update(anaUid, "Ana Souza", "Ciência da Computação").await()
 
         attendees.sync(anaUid, OPEN, users.get(anaUid).await()!!, isEnrolled = true, waitlistPosition = 0).await()
@@ -674,6 +697,8 @@ class FirestoreRulesTest {
         val saved = attendeeDoc(OPEN, anaUid).get().await()
         assertEquals("Ana Souza", saved.getString("name"))
         assertEquals(since, saved.getTimestamp("since"))
+        // o QR que ela já tinha continua valendo
+        assertEquals(token, saved.getString("checkinToken"))
     }
 
     // ---------- comentários ----------

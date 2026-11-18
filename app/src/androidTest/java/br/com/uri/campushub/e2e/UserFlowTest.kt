@@ -2,6 +2,8 @@ package br.com.uri.campushub.e2e
 
 import android.content.Context
 import android.content.Intent
+import android.graphics.drawable.BitmapDrawable
+import android.widget.ImageView
 import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.espresso.Espresso.closeSoftKeyboard
@@ -14,6 +16,7 @@ import androidx.test.espresso.action.ViewActions.replaceText
 import androidx.test.espresso.assertion.ViewAssertions.matches
 import androidx.test.espresso.matcher.RootMatchers.isDialog
 import androidx.test.espresso.matcher.ViewMatchers.Visibility
+import androidx.test.espresso.matcher.ViewMatchers.isDisplayed
 import androidx.test.espresso.matcher.ViewMatchers.isEnabled
 import androidx.test.espresso.matcher.ViewMatchers.withContentDescription
 import androidx.test.espresso.matcher.ViewMatchers.withEffectiveVisibility
@@ -27,6 +30,7 @@ import br.com.uri.campushub.data.repository.EnrollmentRepository
 import br.com.uri.campushub.data.repository.EventRepository
 import br.com.uri.campushub.data.repository.FavoriteRepository
 import br.com.uri.campushub.data.repository.WaitlistRepository
+import br.com.uri.campushub.domain.CheckinCode
 import br.com.uri.campushub.testing.EmulatorData.ADMIN_EMAIL
 import br.com.uri.campushub.testing.EmulatorData.PASSWORD
 import br.com.uri.campushub.testing.EmulatorData.createAdmin
@@ -35,6 +39,7 @@ import br.com.uri.campushub.testing.EmulatorData.daysFromNow
 import br.com.uri.campushub.testing.EmulatorData.saveEvents
 import br.com.uri.campushub.testing.EmulatorData.signIn
 import br.com.uri.campushub.testing.FirebaseEmulator
+import br.com.uri.campushub.testing.QrDecoder
 import br.com.uri.campushub.testing.await
 import br.com.uri.campushub.testing.nestedScrollTo
 import br.com.uri.campushub.testing.waitFor
@@ -196,6 +201,29 @@ class UserFlowTest {
         }
 
         assertEquals(0, WaitlistRepository(db).getPosition(uid, "lotado").await())
+    }
+
+    // fluxo 5: a aluna inscrita abre o QR de check-in; a imagem mostrada é um QR válido
+    // com o evento, ela e o segredo salvo na lista do organizador
+    @Test
+    fun enrolledStudentShowsTheCheckinQrCode() {
+        val uid = createStudent(EMAIL, NAME, COURSE)
+        EnrollmentRepository(db).enroll(uid, EVENT_ID).await()
+        val token = db.collection("events").document(EVENT_ID).collection("attendees").document(uid)
+            .get().await().getString("checkinToken")!!
+
+        val intent = Intent(context, EventDetailsActivity::class.java)
+            .putExtra(EventDetailsActivity.EXTRA_EVENT_ID, EVENT_ID)
+        ActivityScenario.launch<EventDetailsActivity>(intent).use {
+            waitFor(withId(R.id.btnCheckinQr))
+            onView(withId(R.id.btnCheckinQr)).perform(nestedScrollTo(), click())
+
+            onView(withText(NAME)).inRoot(isDialog()).check(matches(isDisplayed()))
+            onView(withId(R.id.imgQr)).inRoot(isDialog()).check { view, _ ->
+                val bitmap = ((view as ImageView).drawable as BitmapDrawable).bitmap
+                assertEquals(CheckinCode.encode(EVENT_ID, uid, token), QrDecoder.decode(bitmap))
+            }
+        }
     }
 
     // fluxo 4: a aluna está na fila e quem ocupava a vaga cancela (sem atender a fila).

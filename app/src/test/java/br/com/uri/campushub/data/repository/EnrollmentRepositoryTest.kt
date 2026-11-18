@@ -42,7 +42,8 @@ class EnrollmentRepositoryTest {
     private val enrollmentSnapshot = mockk<DocumentSnapshot>()
     private val attendeeRef = mockk<DocumentReference>()
     private val userSnapshot = mockk<DocumentSnapshot>()
-    private val repository = EnrollmentRepository(db)
+    // segredo do QR fixo, no lugar do gerado ao acaso
+    private val repository = EnrollmentRepository(db) { "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" }
 
     @Before
     fun setUp() {
@@ -112,7 +113,8 @@ class EnrollmentRepositoryTest {
         verify {
             transaction.set(
                 attendeeRef,
-                mapOf("name" to "Ana", "course" to "Direito", "status" to "enrolled", "since" to FieldValue.serverTimestamp())
+                mapOf("name" to "Ana", "course" to "Direito", "status" to "enrolled", "since" to FieldValue.serverTimestamp(),
+                    "checkinToken" to "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
             )
         }
     }

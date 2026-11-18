@@ -22,6 +22,7 @@ import br.com.uri.campushub.R
 import br.com.uri.campushub.data.model.Comment
 import br.com.uri.campushub.data.model.Event
 import br.com.uri.campushub.data.model.EventStatus
+import br.com.uri.campushub.data.model.Attendee
 import br.com.uri.campushub.data.model.User
 import br.com.uri.campushub.data.repository.AttendeeRepository
 import br.com.uri.campushub.data.repository.AuthRepository
@@ -33,10 +34,12 @@ import br.com.uri.campushub.data.repository.RatingRepository
 import br.com.uri.campushub.data.repository.UserRepository
 import br.com.uri.campushub.data.repository.WaitlistRepository
 import br.com.uri.campushub.domain.CampusTime
+import br.com.uri.campushub.domain.CheckinRules
 import br.com.uri.campushub.domain.EnrollmentRules
 import br.com.uri.campushub.domain.OrganizerRules
 import br.com.uri.campushub.domain.RatingRules
 import br.com.uri.campushub.domain.WaitlistRules
+import br.com.uri.campushub.ui.checkin.CheckinQrDialog
 import br.com.uri.campushub.ui.common.EventImages
 import br.com.uri.campushub.ui.common.applySystemBarsPadding
 import br.com.uri.campushub.ui.common.setupToolbar
@@ -82,6 +85,7 @@ class EventDetailsActivity : AppCompatActivity() {
     private lateinit var btnCloseEnrollments: MaterialButton
     private lateinit var btnFinish: MaterialButton
     private lateinit var btnAttendees: MaterialButton
+    private lateinit var btnCheckinQr: MaterialButton
     private lateinit var txtWaitlist: TextView
     private lateinit var btnLeaveWaitlist: MaterialButton
     private lateinit var btnEnroll: MaterialButton
@@ -119,6 +123,9 @@ class EventDetailsActivity : AppCompatActivity() {
 
     // true quando a conta logada é a organizadora responsável pelo evento e ele ainda não foi encerrado
     private var canEdit = false
+
+    // documento do aluno na lista do organizador (com o segredo do QR); null até o sync responder
+    private var myAttendee: Attendee? = null
 
     // evento carregado, usado ao excluir (a capa vai junto); canDelete = dono e sem inscritos
     private var loadedEvent: Event? = null
@@ -160,6 +167,7 @@ class EventDetailsActivity : AppCompatActivity() {
         btnCloseEnrollments = findViewById(R.id.btnCloseEnrollments)
         btnFinish = findViewById(R.id.btnFinish)
         btnAttendees = findViewById(R.id.btnAttendees)
+        btnCheckinQr = findViewById(R.id.btnCheckinQr)
         txtWaitlist = findViewById(R.id.txtWaitlist)
         btnLeaveWaitlist = findViewById(R.id.btnLeaveWaitlist)
         btnEnroll = findViewById(R.id.btnEnroll)
@@ -195,6 +203,12 @@ class EventDetailsActivity : AppCompatActivity() {
         btnPublish.setOnClickListener { confirmPublish() }
         btnCloseEnrollments.setOnClickListener { confirmCloseEnrollments() }
         btnFinish.setOnClickListener { confirmFinish() }
+        // QR do aluno: evento e documento da lista já carregados (o botão só aparece com os dois)
+        btnCheckinQr.setOnClickListener {
+            val event = loadedEvent ?: return@setOnClickListener
+            val attendee = myAttendee ?: return@setOnClickListener
+            CheckinQrDialog.show(this, event, attendee)
+        }
         // lista de inscritos e da fila, só para o organizador dono (o botão só aparece para ele)
         btnAttendees.setOnClickListener {
             val intent = Intent(this, AttendeesActivity::class.java)
@@ -335,7 +349,7 @@ class EventDetailsActivity : AppCompatActivity() {
                 showStatus(event, isOwner)
                 showRatingState(event, isEnrolled, myRating)
                 if (event.hasEnded()) loadRatingAverage()
-                syncAttendee(user, isEnrolled, waitlistTask.result)
+                syncAttendee(event, user, isEnrolled, waitlistTask.result)
             }
             .addOnFailureListener { error ->
                 if (isGone()) return@addOnFailureListener
@@ -507,9 +521,17 @@ class EventDetailsActivity : AppCompatActivity() {
     // inscrito ou na fila: confere o próprio documento na lista do organizador (AttendeeRepository.sync,
     // Firestore) e cria ou corrige se preciso (inscrição de antes da lista existir, nome trocado no perfil).
     // Roda em segundo plano; uma falha não atrapalha a tela e é tentada de novo na próxima abertura
-    private fun syncAttendee(user: User?, isEnrolled: Boolean, waitlistPosition: Int) {
+    // O documento devolvido traz o segredo do QR: com ele, o aluno inscrito vê o botão do QR de check-in
+    private fun syncAttendee(event: Event, user: User?, isEnrolled: Boolean, waitlistPosition: Int) {
+        myAttendee = null
+        btnCheckinQr.visibility = View.GONE
         if (user == null || (!isEnrolled && waitlistPosition == 0)) return
         attendeeRepository.sync(uid, eventId, user, isEnrolled, waitlistPosition)
+            .addOnSuccessListener { attendee ->
+                if (isGone()) return@addOnSuccessListener
+                myAttendee = attendee
+                btnCheckinQr.visibility = visibleIf(CheckinRules.canShowQr(event, attendee))
+            }
             .addOnFailureListener { error -> Log.w("EventDetails", "sync da lista de inscritos falhou", error) }
     }
 

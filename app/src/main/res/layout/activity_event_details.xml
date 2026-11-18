@@ -212,6 +212,17 @@
                 app:drawableStartCompat="@drawable/ic_check_circle"
                 app:drawableTint="@color/chip_open_text" />
 
+            <!-- aluno inscrito, evento ainda não encerrado: abre o QR Code de check-in (CheckinQrDialog) -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnCheckinQr"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:layout_marginTop="12dp"
+                android:text="@string/my_checkin_qr"
+                android:visibility="gone"
+                app:cornerRadius="12dp"
+                app:icon="@drawable/ic_qr_code" />
+
             <!-- aluno na lista de espera de um evento lotado: posição na fila -->
             <TextView
                 android:id="@+id/txtWaitlist"

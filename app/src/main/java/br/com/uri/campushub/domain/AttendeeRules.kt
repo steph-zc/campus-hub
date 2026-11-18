@@ -16,10 +16,12 @@ object AttendeeRules {
         else -> null
     }
 
-    // o documento salvo (null = não existe) não bate com o perfil e a situação atuais
+    // o documento salvo (null = não existe) não bate com o perfil e a situação atuais,
+    // ou ainda não tem o segredo do QR de check-in (documentos de antes do QR existir)
     fun needsSync(saved: Attendee?, user: User, expected: String?): Boolean = when {
         expected == null -> saved != null
         saved == null -> true
         else -> saved.status != expected || saved.name != user.name || saved.course != user.course
+            || !CheckinCode.isValidToken(saved.checkinToken)
     }
 }

@@ -486,12 +486,15 @@ service cloud.firestore {
       // o próprio aluno grava o documento dele, com o nome e o curso do perfil (users/{uid})
       // e a situação verdadeira depois da gravação: 'enrolled' com a inscrição existindo,
       // 'waiting' com o lugar na fila e sem inscrição. since é a hora do servidor, ou a já salva
-      // quando a situação não muda (só o nome ou o curso foram atualizados)
+      // quando a situação não muda (só o nome ou o curso foram atualizados).
+      // checkinToken é o segredo do QR de check-in: 32 dígitos hexadecimais (CheckinCode no app)
       function isOwnAttendee(uid) {
         let profile = get(/databases/$(database)/documents/users/$(uid)).data;
         let enrolled = existsAfter(enrollmentPath(uid, eventId));
         return isOwner(uid)
-          && hasExactly(['name', 'course', 'status', 'since'])
+          && hasExactly(['name', 'course', 'status', 'since', 'checkinToken'])
+          && data().checkinToken is string
+          && data().checkinToken.matches('^[0-9a-f]{32}$')
           && data().name == profile.name
           && data().course == profile.course
           && (data().since == request.time

@@ -13,7 +13,7 @@ import org.junit.Test
 class AttendeeRulesTest {
 
     private val ana = User(name = "Ana", course = "Direito")
-    private val enrolledAna = Attendee(name = "Ana", course = "Direito", status = Attendee.ENROLLED)
+    private val enrolledAna = Attendee(name = "Ana", course = "Direito", status = Attendee.ENROLLED, checkinToken = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
 
     @Test
     fun `expected status follows the enrollment and the queue`() {
@@ -41,5 +41,11 @@ class AttendeeRulesTest {
         assertTrue(AttendeeRules.needsSync(enrolledAna, ana.copy(name = "Ana Souza"), Attendee.ENROLLED))
         assertTrue(AttendeeRules.needsSync(enrolledAna, ana.copy(course = "Medicina"), Attendee.ENROLLED))
         assertTrue(AttendeeRules.needsSync(enrolledAna, ana, expected = null))
+    }
+
+    // documento de antes do QR existir: ganha o segredo na próxima abertura do evento
+    @Test
+    fun `document without the check-in secret is fixed`() {
+        assertTrue(AttendeeRules.needsSync(enrolledAna.copy(checkinToken = ""), ana, Attendee.ENROLLED))
     }
 }
